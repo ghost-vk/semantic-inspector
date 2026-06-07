@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { resolveTarget } from './resolveTarget';
+import { resolveComp, resolveTarget } from './resolveTarget';
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -35,5 +35,15 @@ describe('resolveTarget', () => {
 
   it('returns null for null input', () => {
     expect(resolveTarget(null)).toBeNull();
+  });
+
+  it('resolveComp reads data-comp directly from the given element', () => {
+    document.body.innerHTML = `<button id="b" data-comp="NavItem">x</button>`;
+    expect(resolveComp(document.getElementById('b') as Element)).toBe('NavItem');
+  });
+
+  it('resolveComp falls back to the tag name when nothing is stamped', () => {
+    document.body.innerHTML = `<button id="b">x</button>`;
+    expect(resolveComp(document.getElementById('b') as Element)).toBe('button');
   });
 });

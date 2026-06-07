@@ -1,10 +1,13 @@
 import { transformAsync } from '@babel/core';
 import type { Plugin } from 'vite';
+import { createAnnotationMiddleware } from './annotationMiddleware';
 import { type StampLocOptions, stampLocBabel } from './stampLocBabel';
 
 export interface StampLocViteOptions extends StampLocOptions {
   /** Which files to stamp. Default /\.[jt]sx$/. */
   include?: RegExp;
+  /** Path the annotation middleware listens on. Must match the SemanticInspector `annotateEndpoint` prop. Default '/__semantic_inspector/annotations'. */
+  annotateEndpoint?: string;
 }
 
 /**
@@ -24,11 +27,15 @@ export function stampLocVite(opts: StampLocViteOptions = {}): Plugin {
     attrComp: opts.attrComp,
     rootDir: opts.rootDir
   };
+  const rootDir = opts.rootDir ?? process.cwd();
 
   return {
     name: 'semantic-inspector:stamp-loc',
     enforce: 'pre',
     apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use(createAnnotationMiddleware(rootDir, { endpoint: opts.annotateEndpoint }));
+    },
     async transform(code, id) {
       const file = id.split('?')[0];
       if (!include.test(file) || file.includes('/node_modules/')) return null;

@@ -53,6 +53,84 @@ flowchart LR
   C -->|"Shift+click"| F["clipboard: PNG (modern-screenshot)"]
 ```
 
+## Semantic payload (opt-in)
+
+By default a click copies one line: `Component — file:line:col`. Pass `semantic` to copy a
+self-describing block instead — handy so an AI knows *which* element you meant without extra
+explanation:
+
+```tsx
+<SemanticInspector semantic />
+```
+
+Clicking the "Рубрики" item then copies:
+
+```
+NavItem — src/components/Navigation/Sidebar.tsx:93:15
+text: "Рубрики"
+index: 2/5
+path: App › Sidebar › NavItem
+testid: nav-rubrics
+```
+
+Fields are added only when meaningful (e.g. `index` is dropped for a lone element). The visible
+text is whitespace-collapsed and capped at 160 chars; the component path keeps the 4 nearest
+`data-comp` ancestors; attributes are limited to `id`, `data-testid`, `name`, `href`, `type`.
+Everything is read at click time, so hover stays cheap and the overlay tip is unchanged. A custom
+`formatText` receives the full `SemanticInfo` object when `semantic` is on.
+
+> **Note:** the block includes the element's visible text and its `href`, and the whole thing is
+> meant to be pasted into an AI chat. Avoid `semantic` on screens showing secrets or PII (tokens in
+> URLs, personal data in labels) — or strip those fields with a custom `formatText`.
+
+## Annotate mode (opt-in)
+
+Beyond copying a pointer, you can give an element a durable, human-friendly name so you and an AI
+share the same vocabulary later — without re-inspecting. Enable it and press the annotate hotkey
+(default `Alt+Shift+A`) to enter annotate mode; click an element to open an inline editor for a
+**name** (+ optional **tags** and a **note**):
+
+```tsx
+<SemanticInspector annotate onAnnotate={(a) => toast(`saved ${a.name}`)} />
+```
+
+Saving POSTs to a dev-server endpoint that the Vite plugin adds (`configureServer`, dev only) and
+writes two files at your project root:
+
+- `.semantic-inspector/annotations.json` — source of truth (upserted by name).
+- `.semantic-inspector/annotations.md` — a regenerated, human/Graphify-readable mirror.
+
+Each annotation is anchored on a **durable descriptor** — the same signals as the semantic payload
+(component, visible text, sibling index, component path, and stable attributes such as
+`data-testid`) — not on `file:line:col`. The line/file is kept only as a `lastSeen` hint. So when an
+AI later needs "the пилюля," it reads the file and re-finds the element by grepping the stable
+signals (testid → id → visible text + component), which survive refactors far better than a line
+number.
+
+Commit `.semantic-inspector/` to share the vocabulary with your team and your AI.
+
+> **Note (privacy):** annotations store the element's visible text, your note, and stable attributes
+> (including `href`) in a repo file. Avoid annotating elements whose text/URL contains secrets or
+> PII, and review `.semantic-inspector/annotations.json` before committing.
+
+> **Note (security):** the annotate endpoint is an **unauthenticated POST that writes into your
+> working tree**, mounted only on the Vite dev server. It requires `Content-Type: application/json`
+> and rejects cross-origin requests (so a random page you visit can't drive-by-write your repo), but
+> keep the dev server on `localhost` and don't expose it on an untrusted network (`--host`). The
+> endpoint never exists in a production build.
+
+> **Note (AI trust boundary):** `annotations.md` is fed to an AI (Graphify) and committed, yet its
+> field values (`name`, `note`, `text`, attributes) are untrusted free text. The mirror escapes
+> Markdown and flags the values as untrusted, but that cannot stop *semantic* prompt injection —
+> review entries before feeding the mirror to an automated agent, exactly as you would any other
+> repo text an AI ingests.
+
+### How an AI resolves a name
+
+Given a name (e.g. "пилюля"): read `.semantic-inspector/annotations.json`, find the entry, then grep
+the live code in decreasing order of stability — `data-testid` → `id`/`name`/`href` → visible
+`text` near the `data-comp`. Treat `lastSeen.loc` as a first guess only; verify it.
+
 ## Three entry points
 
 | Import                     | What it is                                                          |
@@ -125,13 +203,21 @@ const SemanticInspector = lazy(() =>
 | prop         | default                  | purpose                                   |
 | ------------ | ------------------------ | ----------------------------------------- |
 | `hotkey`     | `'Alt+Shift+S'`          | toggle inspect mode (Esc always exits)    |
-| `formatText` | `` `${comp} — ${loc}` `` | format of the text copied on click; receives `{ comp, loc }` (`loc` may be `null`) |
+| `semantic`   | `false`                  | enrich the copied text with visible label, sibling index, component path, and key attributes (see [Semantic payload](#semantic-payload-opt-in)) |
+| `annotate`   | `false`                  | enable annotate mode: a hotkey opens an inline editor to name an element; the annotation is persisted to `.semantic-inspector/` via the dev plugin (see [Annotate mode](#annotate-mode-opt-in)) |
+| `annotateHotkey` | `'Alt+Shift+A'`      | hotkey that toggles annotate mode |
+| `annotateEndpoint` | `'/__semantic_inspector/annotations'` | override the POST endpoint path |
+| `onAnnotate` | —                        | called with the saved annotation after a successful save |
+| `formatText` | `` `${comp} — ${loc}` `` | format of the text copied on click; receives `SemanticInfo` (the extra fields are populated only when `semantic` is on; `loc` may be `null`) |
 | `onCopy`     | —                        | called after a successful copy            |
 | `onError`    | —                        | called on a clipboard/screenshot failure  |
 
 `useInspector(props)` is also exported for building a custom overlay; it returns
-`{ active, target }`. Note: used raw (not via `<SemanticInspector>`), it has no default `onError`,
-so failures only surface via `console.warn` unless you pass one.
+`{ active, mode, target, draft, closeDraft }` — `mode` is `'off' | 'inspect' | 'annotate'`, `draft`
+is non-null while the annotation editor should be open (with the captured `anchor`/`lastSeen`), and
+`closeDraft()` dismisses it. `active` is kept as a back-compat alias for `mode !== 'off'`. Note: used
+raw (not via `<SemanticInspector>`), it has no default `onError`, so failures only surface via
+`console.warn` unless you pass one.
 
 #### Callback payloads
 
@@ -146,6 +232,7 @@ so failures only surface via `console.warn` unless you pass one.
 | ---------- | ---------------- | ------------ | ---------------------------------------------- |
 | `rootDir`  | `process.cwd()`  | both         | base for the relative path written into `data-loc` |
 | `include`  | `/\.[jt]sx$/`    | `/vite` only | which module ids get stamped                   |
+| `annotateEndpoint` | `'/__semantic_inspector/annotations'` | `/vite` only | path the annotate middleware listens on; must match the `<SemanticInspector annotateEndpoint>` prop |
 | `attrLoc`  | `'data-loc'`     | both         | attribute name for `path:line:col`             |
 | `attrComp` | `'data-comp'`    | both         | attribute name for the component name          |
 

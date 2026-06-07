@@ -1,12 +1,40 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { captureAnchor } from './buildAnnotation';
 import { copyElementShot, copyText } from './clipboard';
+import { extractSemantics } from './extractSemantics';
 import { resolveTarget } from './resolveTarget';
-import type { CopyKind, InspectTarget, LocInfo, SemanticInspectorProps, UseInspectorResult } from './types';
+import type {
+  AnnotationDraft,
+  CopyKind,
+  InspectMode,
+  InspectTarget,
+  LocInfo,
+  SemanticInfo,
+  SemanticInspectorProps,
+  UseInspectorResult
+} from './types';
 
 const DEFAULT_HOTKEY = 'Alt+Shift+S';
+const DEFAULT_ANNOTATE_HOTKEY = 'Alt+Shift+A';
 
 function defaultFormat(t: LocInfo): string {
   return t.loc ? `${t.comp} — ${t.loc}` : t.comp;
+}
+
+// data-testid reads better as "testid"; other whitelisted attrs use their own name.
+function attrLabel(name: string): string {
+  return name === 'data-testid' ? 'testid' : name;
+}
+
+function semanticFormat(t: SemanticInfo): string {
+  const lines = [t.loc ? `${t.comp} — ${t.loc}` : t.comp];
+  if (t.text) lines.push(`text: "${t.text}"`);
+  if (t.index != null && t.total != null) lines.push(`index: ${t.index}/${t.total}`);
+  if (t.path?.length) lines.push(`path: ${t.path.join(' › ')}`);
+  if (t.attrs) {
+    for (const [k, v] of Object.entries(t.attrs)) lines.push(`${attrLabel(k)}: ${v}`);
+  }
+  return lines.join('\n');
 }
 
 interface Hotkey {
@@ -70,44 +98,56 @@ function sameTarget(a: InspectTarget | null, b: InspectTarget | null): boolean {
 }
 
 /**
- * Inspection-mode state + listeners.
- * - keydown: the hotkey toggles `active`; Esc exits.
- * - active: mousemove (rAF-coalesced) updates `target`; click (capture, preventDefault) copies
- *   text, Shift+click copies an element screenshot.
+ * Inspection + annotation state and listeners.
+ * - keydown: the inspect hotkey toggles inspect mode; the annotate hotkey (when enabled) toggles
+ *   annotate mode; Esc exits. Inspect and annotate are mutually exclusive.
+ * - while a mode is active and no editor is open: mousemove (rAF-coalesced) updates `target`.
+ * - click (capture, preventDefault): in inspect mode copies text / Shift+click a screenshot; in
+ *   annotate mode opens an editor draft (no copy). While the editor is open, listeners are
+ *   suspended so the highlight freezes and editor clicks are not intercepted.
  */
 export function useInspector(opts: SemanticInspectorProps = {}): UseInspectorResult {
-  const { hotkey = DEFAULT_HOTKEY } = opts;
-  const [active, setActive] = useState(false);
+  const { hotkey = DEFAULT_HOTKEY, annotate = false, annotateHotkey = DEFAULT_ANNOTATE_HOTKEY } = opts;
+  const [mode, setMode] = useState<InspectMode>('off');
   const [target, setTarget] = useState<InspectTarget | null>(null);
+  const [draft, setDraft] = useState<AnnotationDraft | null>(null);
 
   // Fresh callbacks without re-subscribing listeners.
   const cbRef = useRef<SemanticInspectorProps>(opts);
   cbRef.current = opts;
 
-  // Latest hovered target, so the click handler copies exactly what is highlighted.
+  // Latest hovered target, so the click handler acts on exactly what is highlighted.
   const targetRef = useRef<InspectTarget | null>(null);
 
   const hk = useMemo(() => parseHotkey(hotkey), [hotkey]);
+  const ahk = useMemo(() => parseHotkey(annotateHotkey), [annotateHotkey]);
+
+  const closeDraft = useCallback(() => setDraft(null), []);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
       if (matchHotkey(e, hk)) {
         e.preventDefault();
-        setActive((a) => !a);
+        setMode((m) => (m === 'inspect' ? 'off' : 'inspect'));
+      } else if (annotate && matchHotkey(e, ahk)) {
+        e.preventDefault();
+        setMode((m) => (m === 'annotate' ? 'off' : 'annotate'));
       } else if (e.key === 'Escape') {
-        setActive((a) => (a ? false : a));
+        setMode((m) => (m === 'off' ? m : 'off'));
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [hk]);
+  }, [hk, ahk, annotate]);
 
   useEffect(() => {
-    if (!active) {
+    if (mode === 'off') {
       targetRef.current = null;
       setTarget(null);
+      setDraft(null);
       return;
     }
+    if (draft) return; // editor open: freeze the highlight and suspend listeners
 
     let rafId = 0;
     let lastX = 0;
@@ -131,7 +171,16 @@ export function useInspector(opts: SemanticInspectorProps = {}): UseInspectorRes
       if (!t) return;
       e.preventDefault();
       e.stopPropagation();
-      const { formatText = defaultFormat, onCopy, onError } = cbRef.current;
+
+      if (mode === 'annotate') {
+        // Snapshot the descriptor now (highlight is about to freeze), so the saved anchor reflects
+        // exactly what was clicked even if the DOM changes while the editor is open.
+        const { anchor, lastSeen } = captureAnchor(t.el);
+        setDraft({ target: t, anchor, lastSeen });
+        return;
+      }
+
+      const { formatText, onCopy, onError, semantic = false } = cbRef.current;
       const done = (kind: CopyKind, payload: string): void => onCopy?.(kind, payload);
       const fail = (kind: CopyKind, err: unknown): void => {
         if (onError) onError(kind, err);
@@ -151,7 +200,9 @@ export function useInspector(opts: SemanticInspectorProps = {}): UseInspectorRes
             shotInFlight = false;
           });
       } else {
-        const text = formatText({ comp: t.comp, loc: t.loc });
+        const info: SemanticInfo = semantic ? extractSemantics(t.el) : { comp: t.comp, loc: t.loc };
+        const fmt: (i: SemanticInfo) => string = formatText ?? (semantic ? semanticFormat : defaultFormat);
+        const text = fmt(info);
         copyText(text).then(
           () => done('text', text),
           (err: unknown) => fail('text', err)
@@ -169,7 +220,7 @@ export function useInspector(opts: SemanticInspectorProps = {}): UseInspectorRes
       if (rafId) cancelAnimationFrame(rafId);
       document.body.style.cursor = prevCursor;
     };
-  }, [active]);
+  }, [mode, draft]);
 
-  return { active, target };
+  return { active: mode !== 'off', mode, target, draft, closeDraft };
 }
