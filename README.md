@@ -79,6 +79,10 @@ text is whitespace-collapsed and capped at 160 chars; the component path keeps t
 Everything is read at click time, so hover stays cheap and the overlay tip is unchanged. A custom
 `formatText` receives the full `SemanticInfo` object when `semantic` is on.
 
+> **Note:** the block includes the element's visible text and its `href`, and the whole thing is
+> meant to be pasted into an AI chat. Avoid `semantic` on screens showing secrets or PII (tokens in
+> URLs, personal data in labels) — or strip those fields with a custom `formatText`.
+
 ## Three entry points
 
 | Import                     | What it is                                                          |

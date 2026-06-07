@@ -20,6 +20,15 @@ describe('extractSemantics — text', () => {
     expect(t.endsWith('…')).toBe(true);
   });
 
+  it('truncates on a code-point boundary without splitting a surrogate pair', () => {
+    // Cap falls inside the emoji run; a UTF-16 slice would leave a lone surrogate.
+    document.body.innerHTML = `<button id="b" data-comp="Btn">${'x'.repeat(159)}${'😀'.repeat(5)}</button>`;
+    const t = extractSemantics(el('b')).text as string;
+    expect(t.endsWith('…')).toBe(true);
+    expect(t).toContain('😀'); // kept whole, not a broken half-character
+    expect(t).not.toContain('�');
+  });
+
   it('omits text when empty', () => {
     document.body.innerHTML = `<div id="d" data-comp="D"></div>`;
     expect(extractSemantics(el('d')).text).toBeUndefined();

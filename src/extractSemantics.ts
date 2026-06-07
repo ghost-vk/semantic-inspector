@@ -30,7 +30,8 @@ export function extractSemantics(el: Element): SemanticInfo {
 function extractText(el: Element): string | undefined {
   const raw = (el.textContent ?? '').replace(/\s+/g, ' ').trim();
   if (!raw) return undefined;
-  return raw.length > TEXT_CAP ? `${raw.slice(0, TEXT_CAP)}…` : raw;
+  // Slice by code point (spread) so the cap never splits a surrogate pair (emoji / astral chars).
+  return raw.length > TEXT_CAP ? `${[...raw].slice(0, TEXT_CAP).join('')}…` : raw;
 }
 
 function siblingIndex(el: Element): { index: number; total: number } | null {

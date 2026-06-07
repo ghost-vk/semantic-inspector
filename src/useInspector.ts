@@ -25,7 +25,7 @@ function attrLabel(name: string): string {
 function semanticFormat(t: SemanticInfo): string {
   const lines = [t.loc ? `${t.comp} — ${t.loc}` : t.comp];
   if (t.text) lines.push(`text: "${t.text}"`);
-  if (t.index && t.total) lines.push(`index: ${t.index}/${t.total}`);
+  if (t.index != null && t.total != null) lines.push(`index: ${t.index}/${t.total}`);
   if (t.path?.length) lines.push(`path: ${t.path.join(' › ')}`);
   if (t.attrs) {
     for (const [k, v] of Object.entries(t.attrs)) lines.push(`${attrLabel(k)}: ${v}`);
