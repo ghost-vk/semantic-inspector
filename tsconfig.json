@@ -11,6 +11,7 @@
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
     "isolatedModules": true,
+    "isolatedDeclarations": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "ignoreDeprecations": "6.0",
@@ -18,5 +19,5 @@
     "noEmit": true,
     "types": ["node", "vitest/globals"]
   },
-  "include": ["src", "vitest.config.ts", "tsup.config.ts"]
+  "include": ["src"]
 }

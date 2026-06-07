@@ -1,6 +1,6 @@
 {
   "name": "semantic-inspector",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Dev-only React inspector: a hotkey highlights elements and click-copies their `Component — file:line` (or a PNG screenshot) for fast context handoff to AI coding assistants.",
   "type": "module",
   "license": "MIT",
@@ -31,7 +31,6 @@
   ],
   "sideEffects": false,
   "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
@@ -71,33 +70,50 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "test:cov": "vitest run --coverage",
+    "test:dist": "node scripts/smoke.mjs",
+    "lint:pkg": "publint --strict && attw --pack . --profile node16",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "changeset publish",
+    "prepublishOnly": "npm run build && npm run lint:pkg"
   },
   "peerDependencies": {
+    "@babel/core": ">=7.25",
     "react": ">=18",
     "react-dom": ">=18",
-    "vite": ">=4"
+    "vite": ">=5"
   },
   "peerDependenciesMeta": {
+    "@babel/core": {
+      "optional": true
+    },
     "vite": {
       "optional": true
     }
   },
   "dependencies": {
-    "@babel/core": "^7.25.0",
     "modern-screenshot": "^4.7.0"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.1",
+    "@babel/core": "^7.25.0",
+    "@biomejs/biome": "^2.0.0",
+    "@changesets/cli": "^2.27.0",
     "@testing-library/react": "^16.3.2",
     "@types/babel__core": "^7.20.5",
-    "@types/node": "^25.9.2",
+    "@types/node": "^20.19.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^6.0.0",
+    "@vitest/coverage-v8": "^4.1.4",
     "happy-dom": "^20.9.0",
+    "publint": "^0.3.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tsup": "^8.3.0",
@@ -109,6 +125,6 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   }
 }
