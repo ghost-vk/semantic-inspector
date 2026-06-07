@@ -641,6 +641,17 @@ function isSource(name: string): boolean {
   return true;
 }
 
+// readdirSync has typed overloads; an explicit annotation (e.g. ReturnType<typeof readdirSync>)
+// resolves to the Buffer variant and breaks string ops. Leave this helper UN-annotated so TS
+// infers Dirent<string>[].
+function readEntries(absDir: string) {
+  try {
+    return readdirSync(absDir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Recursively collect source files under `root`, returning relative POSIX paths. Skips
  * node_modules/dist, dotdirs (.git, .semantic-inspector), test files and .d.ts. When `include`
@@ -649,13 +660,7 @@ function isSource(name: string): boolean {
 export function collectSourceFiles(root: string, include?: string[]): string[] {
   const out: string[] = [];
   const walk = (absDir: string, relDir: string): void => {
-    let entries: ReturnType<typeof readdirSync>;
-    try {
-      entries = readdirSync(absDir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const e of entries) {
+    for (const e of readEntries(absDir)) {
       const rel = relDir ? `${relDir}/${e.name}` : e.name;
       if (e.isDirectory()) {
         if (SKIP_DIRS.has(e.name) || e.name.startsWith('.')) continue;
@@ -675,7 +680,12 @@ export function collectSourceFiles(root: string, include?: string[]): string[] {
 Run: `npx vitest run src/collectSourceFiles.test.ts`
 Expected: PASS (3 tests).
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Typecheck**
+
+Run: `npm run typecheck`
+Expected: PASS. (Vitest strips types, so the test passing does NOT prove types compile — `readdirSync`'s overloads are a known trap. Always run tsc.)
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add src/collectSourceFiles.ts src/collectSourceFiles.test.ts
