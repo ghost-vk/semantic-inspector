@@ -1,5 +1,5 @@
+import type { types as BabelTypes, NodePath } from '@babel/core';
 import { parseSync, traverse } from '@babel/core';
-import type { NodePath, types as BabelTypes } from '@babel/core';
 import { isHostElement, nearestComponentName } from './stampLocBabel';
 import type { StaticElement } from './types';
 
@@ -68,7 +68,7 @@ export function staticAnchors(file: string, source: string): StaticElement[] {
     babelrc: false,
     configFile: false,
     sourceType: 'module',
-    parserOpts: { plugins: parserPlugins(file), errorRecovery: false },
+    parserOpts: { plugins: parserPlugins(file), errorRecovery: false }
   });
   if (!ast) throw new Error(`failed to parse ${file}`);
 
@@ -84,12 +84,12 @@ export function staticAnchors(file: string, source: string): StaticElement[] {
         loc: `${file}:${loc.start.line}:${loc.start.column + 1}`,
         comp: nearestComponentName(path),
         path: componentPath(path),
-        attrs: literalAttrs(open),
+        attrs: literalAttrs(open)
       };
       const text = literalText(path.node);
       if (text) el.text = text;
       out.push(el);
-    },
+    }
   });
   return out;
 }

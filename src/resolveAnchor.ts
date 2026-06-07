@@ -63,7 +63,7 @@ export function resolveAnchor(
     name,
     lastSeenLoc: lastSeen.loc,
     resolvedLoc: null as string | null,
-    candidates: [] as { loc: string; score: number }[],
+    candidates: [] as { loc: string; score: number }[]
   };
 
   if (!verifiable(anchor)) return { ...base, verdict: 'unverifiable' };
