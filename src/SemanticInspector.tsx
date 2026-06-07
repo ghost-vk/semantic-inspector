@@ -24,6 +24,7 @@ export function SemanticInspector(props: SemanticInspectorProps): JSX.Element | 
 
   const { active, target } = useInspector({
     hotkey: props.hotkey,
+    semantic: props.semantic,
     formatText: props.formatText,
     onCopy: (kind: CopyKind, payload: string) => {
       setToast(kind === 'text' ? `✓ ${payload}` : '✓ screenshot copied');
