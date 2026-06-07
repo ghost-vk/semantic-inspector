@@ -1,5 +1,6 @@
 import { transformAsync } from '@babel/core';
 import type { Plugin } from 'vite';
+import { createAnnotationMiddleware } from './annotationMiddleware';
 import { type StampLocOptions, stampLocBabel } from './stampLocBabel';
 
 export interface StampLocViteOptions extends StampLocOptions {
@@ -24,11 +25,15 @@ export function stampLocVite(opts: StampLocViteOptions = {}): Plugin {
     attrComp: opts.attrComp,
     rootDir: opts.rootDir
   };
+  const rootDir = opts.rootDir ?? process.cwd();
 
   return {
     name: 'semantic-inspector:stamp-loc',
     enforce: 'pre',
     apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use(createAnnotationMiddleware(rootDir));
+    },
     async transform(code, id) {
       const file = id.split('?')[0];
       if (!include.test(file) || file.includes('/node_modules/')) return null;

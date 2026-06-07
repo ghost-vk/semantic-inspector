@@ -41,4 +41,14 @@ describe('stampLocVite', () => {
     expect(out).toBeNull();
     expect(ctx.warn).toHaveBeenCalled();
   });
+
+  it('mounts an annotations middleware on the dev server', () => {
+    const plugin = stampLocVite();
+    const used: unknown[] = [];
+    const server = { middlewares: { use: (fn: unknown) => used.push(fn) } };
+    // biome-ignore lint/suspicious/noExplicitAny: minimal ViteDevServer double
+    (plugin.configureServer as (s: any) => void)(server as any);
+    expect(used).toHaveLength(1);
+    expect(typeof used[0]).toBe('function');
+  });
 });
