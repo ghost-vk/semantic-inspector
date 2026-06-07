@@ -10,7 +10,7 @@ export interface StampLocOptions {
   rootDir?: string;
 }
 
-function isHostElement(name: BabelTypes.JSXOpeningElement['name']): boolean {
+export function isHostElement(name: BabelTypes.JSXOpeningElement['name']): boolean {
   return name.type === 'JSXIdentifier' && /^[a-z]/.test(name.name);
 }
 
@@ -22,7 +22,7 @@ function hasAttr(el: BabelTypes.JSXOpeningElement, attrName: string): boolean {
 
 // Nearest PascalCase function-component ancestor:
 //   function Foo() {}  |  const Foo = () => {}  |  const Foo = function () {}
-function nearestComponentName(path: NodePath): string | null {
+export function nearestComponentName(path: NodePath): string | null {
   let p: NodePath | null = path;
   while (p) {
     const node = p.node;

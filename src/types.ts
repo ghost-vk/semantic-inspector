@@ -141,3 +141,43 @@ export interface UseInspectorResult {
   /** Close the editor. */
   closeDraft: () => void;
 }
+
+/** A JSX host element recovered statically from source (AST analog of SemanticInfo). */
+export interface StaticElement {
+  /** Relative POSIX file path. */
+  file: string;
+  /** "<relpath>:<line>:<col>" — byte-identical to the data-loc stamp format. */
+  loc: string;
+  /** nearestComponentName, or null when no PascalCase component ancestor exists. */
+  comp: string | null;
+  /** Ancestor component-name chain, root→leaf, consecutive duplicates collapsed, max 4. */
+  path: string[];
+  /** Literal JSXText under the element, whitespace-collapsed, code-point-capped at 160. */
+  text?: string;
+  /** Whitelisted attributes with string-literal values: id, data-testid, name, href, type. */
+  attrs: Record<string, string>;
+}
+
+/** Outcome of re-resolving one annotation against current source. */
+export type DriftVerdict = 'resolved' | 'moved' | 'missing' | 'ambiguous' | 'unverifiable';
+
+/** One annotation's drift result. */
+export interface DriftEntry {
+  name: string;
+  verdict: DriftVerdict;
+  /** lastSeen.loc from the annotation (may be null for an unstamped anchor). */
+  lastSeenLoc: string | null;
+  /** Where it resolves now: equal to lastSeenLoc when resolved, the new loc when moved, else null. */
+  resolvedLoc: string | null;
+  /** Ranked match candidates (score desc, loc asc). */
+  candidates: { loc: string; score: number }[];
+}
+
+/** Aggregate drift result for the whole annotation set. */
+export interface DriftResult {
+  entries: DriftEntry[];
+  /** Count of moved/missing/ambiguous entries (resolved + unverifiable excluded). */
+  drifted: number;
+  /** Count of resolved entries. */
+  ok: number;
+}
