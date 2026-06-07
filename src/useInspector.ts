@@ -180,6 +180,7 @@ export function useInspector(opts: SemanticInspectorProps = {}): UseInspectorRes
         return;
       }
 
+
       const { formatText, onCopy, onError, semantic = false } = cbRef.current;
       const done = (kind: CopyKind, payload: string): void => onCopy?.(kind, payload);
       const fail = (kind: CopyKind, err: unknown): void => {
