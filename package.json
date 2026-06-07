@@ -32,6 +32,9 @@
   "sideEffects": false,
   "main": "./dist/index.cjs",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "semantic-inspector": "./dist/cli.js"
+  },
   "exports": {
     ".": {
       "import": {
