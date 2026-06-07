@@ -4,7 +4,15 @@
   "description": "Dev-only React inspector: a hotkey highlights elements and click-copies their `Component — file:line` (or a PNG screenshot) for fast context handoff to AI coding assistants.",
   "type": "module",
   "license": "MIT",
-  "author": "chains.subplot03@icloud.com",
+  "author": "ghost-vk <chains.subplot03@icloud.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ghost-vk/semantic-inspector.git"
+  },
+  "homepage": "https://github.com/ghost-vk/semantic-inspector#readme",
+  "bugs": {
+    "url": "https://github.com/ghost-vk/semantic-inspector/issues"
+  },
   "keywords": [
     "react",
     "vite",
