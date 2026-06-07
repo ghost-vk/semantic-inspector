@@ -109,9 +109,21 @@ number.
 
 Commit `.semantic-inspector/` to share the vocabulary with your team and your AI.
 
-> **Note:** annotations store the element's visible text, your note, and stable attributes
+> **Note (privacy):** annotations store the element's visible text, your note, and stable attributes
 > (including `href`) in a repo file. Avoid annotating elements whose text/URL contains secrets or
 > PII, and review `.semantic-inspector/annotations.json` before committing.
+
+> **Note (security):** the annotate endpoint is an **unauthenticated POST that writes into your
+> working tree**, mounted only on the Vite dev server. It requires `Content-Type: application/json`
+> and rejects cross-origin requests (so a random page you visit can't drive-by-write your repo), but
+> keep the dev server on `localhost` and don't expose it on an untrusted network (`--host`). The
+> endpoint never exists in a production build.
+
+> **Note (AI trust boundary):** `annotations.md` is fed to an AI (Graphify) and committed, yet its
+> field values (`name`, `note`, `text`, attributes) are untrusted free text. The mirror escapes
+> Markdown and flags the values as untrusted, but that cannot stop *semantic* prompt injection —
+> review entries before feeding the mirror to an automated agent, exactly as you would any other
+> repo text an AI ingests.
 
 ### How an AI resolves a name
 
@@ -201,8 +213,11 @@ const SemanticInspector = lazy(() =>
 | `onError`    | —                        | called on a clipboard/screenshot failure  |
 
 `useInspector(props)` is also exported for building a custom overlay; it returns
-`{ active, target }`. Note: used raw (not via `<SemanticInspector>`), it has no default `onError`,
-so failures only surface via `console.warn` unless you pass one.
+`{ active, mode, target, draft, closeDraft }` — `mode` is `'off' | 'inspect' | 'annotate'`, `draft`
+is non-null while the annotation editor should be open (with the captured `anchor`/`lastSeen`), and
+`closeDraft()` dismisses it. `active` is kept as a back-compat alias for `mode !== 'off'`. Note: used
+raw (not via `<SemanticInspector>`), it has no default `onError`, so failures only surface via
+`console.warn` unless you pass one.
 
 #### Callback payloads
 

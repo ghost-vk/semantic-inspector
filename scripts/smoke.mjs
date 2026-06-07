@@ -19,6 +19,20 @@ assert.ok(
   'dist/index.js must not statically import modern-screenshot'
 );
 
+// The browser entry must stay free of node built-ins. tsup/esbuild rewrites `node:fs` -> `fs` in
+// the bundle, so match BOTH forms. This catches a future value-import (not `import type`) of the
+// node-only annotation store/middleware leaking into the browser graph.
+const NODE_BUILTINS = ['fs', 'path', 'http', 'https', 'os', 'crypto', 'child_process', 'net', 'stream'];
+const builtinImport = new RegExp(`from\\s*['"](?:node:)?(?:${NODE_BUILTINS.join('|')})['"]`);
+assert.ok(
+  !builtinImport.test(indexEsm),
+  'dist/index.js must not import a node built-in (browser entry must stay node-free)'
+);
+assert.ok(
+  !/annotationStore|annotationMiddleware|createAnnotationMiddleware|writeAnnotations/.test(indexEsm),
+  'dist/index.js must not include the node-only annotation store/middleware'
+);
+
 // The runtime ESM entry exposes the public API and hides internals.
 const mod = await import('../dist/index.js');
 assert.ok(mod.SemanticInspector && mod.useInspector, 'index must export SemanticInspector + useInspector');
