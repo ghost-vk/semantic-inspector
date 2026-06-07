@@ -4,6 +4,14 @@ const LOC_ATTR = 'data-loc';
 const COMP_ATTR = 'data-comp';
 
 /**
+ * Resolve a component name for an element: data-comp → React fiber displayName → file base
+ * (from data-loc) → tag name. Operates on the element as-is (no ancestor walk).
+ */
+export function resolveComp(el: Element): string {
+  return el.getAttribute(COMP_ATTR) ?? fiberName(el) ?? fallbackName(el, el.getAttribute(LOC_ATTR));
+}
+
+/**
  * DOM element under the cursor → inspection target.
  *
  * Walks to the nearest ancestor carrying data-loc (stamped by the Babel plugin). If none
@@ -14,8 +22,7 @@ export function resolveTarget(el: Element | null): InspectTarget | null {
   if (!el) return null;
   const target = el.closest(`[${LOC_ATTR}]`) ?? el;
   const loc = target.getAttribute(LOC_ATTR);
-  const comp = target.getAttribute(COMP_ATTR) ?? fiberName(target) ?? fallbackName(target, loc);
-  return { comp, loc, el: target, rect: target.getBoundingClientRect() };
+  return { comp: resolveComp(target), loc, el: target, rect: target.getBoundingClientRect() };
 }
 
 function fallbackName(el: Element, loc: string | null): string {
