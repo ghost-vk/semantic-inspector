@@ -85,6 +85,7 @@ export interface AnnotationDraft {
   lastSeen: AnnotationLastSeen;
 }
 
+
 export interface InspectTarget extends LocInfo {
   /** The resolved DOM element (nearest ancestor with data-loc, or the element itself). */
   el: Element;
