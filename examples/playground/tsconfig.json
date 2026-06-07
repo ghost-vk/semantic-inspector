@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "isolatedDeclarations": false,
+    "types": ["node"],
+    "paths": {
+      "semantic-inspector": ["../../src/index.ts"],
+      "semantic-inspector/vite": ["../../src/vite.ts"]
+    }
+  },
+  "include": ["src", "vite.config.ts"]
+}
