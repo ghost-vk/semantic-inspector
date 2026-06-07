@@ -19,6 +19,8 @@ when you gate and lazy-load it** (see [Mount it](#2-mount-it-behind-your-own-dev
 
 _Click for the full-resolution video._
 
+**Try it locally:** `npm run dev:example` runs a playground app ([`examples/playground`](./examples/playground)) wired to the package source — inspect, screenshot, and annotate against a real page.
+
 ## Install
 
 ```sh
