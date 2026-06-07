@@ -1,9 +1,11 @@
-import type { CSSProperties } from 'react';
+import { type CSSProperties, type JSX, type MemoExoticComponent, memo } from 'react';
 import type { InspectTarget } from './types';
 
+// Just below the 32-bit max so the overlay wins stacking contests, with a small reserved band:
+// Z = highlight box, Z+1 = tip, Z+2 = badge/toast.
 const Z = 2147483600;
 
-const badge: CSSProperties = {
+const badge = {
   position: 'fixed',
   bottom: 12,
   left: 12,
@@ -15,9 +17,9 @@ const badge: CSSProperties = {
   color: '#fff',
   pointerEvents: 'none',
   boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
-};
+} satisfies CSSProperties;
 
-const toastStyle: CSSProperties = {
+const toastStyle = {
   position: 'fixed',
   bottom: 12,
   right: 12,
@@ -32,7 +34,7 @@ const toastStyle: CSSProperties = {
   whiteSpace: 'nowrap',
   overflow: 'hidden',
   textOverflow: 'ellipsis'
-};
+} satisfies CSSProperties;
 
 function boxStyle(r: DOMRect): CSSProperties {
   return {
@@ -46,7 +48,7 @@ function boxStyle(r: DOMRect): CSSProperties {
     background: 'rgba(99,102,241,0.12)',
     pointerEvents: 'none',
     transition: 'all 60ms ease-out'
-  };
+  } satisfies CSSProperties;
 }
 
 function tipStyle(r: DOMRect): CSSProperties {
@@ -63,10 +65,18 @@ function tipStyle(r: DOMRect): CSSProperties {
     color: '#fff',
     pointerEvents: 'none',
     whiteSpace: 'nowrap'
-  };
+  } satisfies CSSProperties;
 }
 
-export function Overlay({ target, toast }: { target: InspectTarget | null; toast: string | null }) {
+interface OverlayProps {
+  target: InspectTarget | null;
+  toast: string | null;
+}
+
+export const Overlay: MemoExoticComponent<(props: OverlayProps) => JSX.Element> = memo(function Overlay({
+  target,
+  toast
+}: OverlayProps): JSX.Element {
   return (
     <>
       <div style={badge}>⌖ inspect · click=name · ⇧click=shot · Esc=exit</div>
@@ -82,4 +92,4 @@ export function Overlay({ target, toast }: { target: InspectTarget | null; toast
       {toast && <div style={toastStyle}>{toast}</div>}
     </>
   );
-}
+});

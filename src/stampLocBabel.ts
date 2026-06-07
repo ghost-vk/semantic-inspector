@@ -1,11 +1,12 @@
-import type { NodePath, PluginObj, types as BabelTypes } from '@babel/core';
+import { isAbsolute, relative, sep } from 'node:path';
+import type { types as BabelTypes, ConfigAPI, NodePath, PluginObj } from '@babel/core';
 
 export interface StampLocOptions {
-  /** Имя атрибута пути. Default 'data-loc'. */
+  /** Path attribute name. Default 'data-loc'. */
   attrLoc?: string;
-  /** Имя атрибута компонента. Default 'data-comp'. */
+  /** Component attribute name. Default 'data-comp'. */
   attrComp?: string;
-  /** База для относительного пути в data-loc. Default process.cwd(). */
+  /** Base for the relative path written into data-loc. Default process.cwd(). */
   rootDir?: string;
 }
 
@@ -19,7 +20,7 @@ function hasAttr(el: BabelTypes.JSXOpeningElement, attrName: string): boolean {
   );
 }
 
-// Ближайшая функция-компонент с PascalCase-именем вверх по дереву:
+// Nearest PascalCase function-component ancestor:
 //   function Foo() {}  |  const Foo = () => {}  |  const Foo = function () {}
 function nearestComponentName(path: NodePath): string | null {
   let p: NodePath | null = path;
@@ -40,25 +41,28 @@ function nearestComponentName(path: NodePath): string | null {
 }
 
 /**
- * Babel-плагин: вешает data-loc="<path>:<line>" и data-comp="<Component>" на
- * JSX host-элементы (div, section, ...). Рантайм-инспектор читает эти DOM-атрибуты
- * (не React-internals), поэтому устойчив к версии React. Компонентные теги
- * (PascalCase) пропускаем — они не дают собственного DOM-узла.
+ * Babel plugin: stamps data-loc="<path>:<line>:<col>" and data-comp="<Component>" onto JSX
+ * host elements (div, section, ...). The runtime inspector reads these DOM attributes (not
+ * React internals), so it stays robust across React versions. Component tags (PascalCase) are
+ * skipped — they don't produce their own DOM node.
  */
-export default function stampLocBabel(babel: { types: typeof BabelTypes }, opts: StampLocOptions = {}): PluginObj {
-  const t = babel.types;
+export function stampLocBabel(api: ConfigAPI & { types: typeof BabelTypes }, opts: StampLocOptions = {}): PluginObj {
+  api.assertVersion(7);
+  const t = api.types;
   const attrLoc = opts.attrLoc ?? 'data-loc';
   const attrComp = opts.attrComp ?? 'data-comp';
   const rootDir = opts.rootDir ?? process.cwd();
 
   const attr = (name: string, value: string) => t.jsxAttribute(t.jsxIdentifier(name), t.stringLiteral(value));
 
-  // path.relative без node:path, чтобы плагин не тянул узловые модули в чужих средах.
+  // Relative POSIX path from rootDir. Files outside rootDir degrade to their basename so an
+  // absolute filesystem path can never leak into the stamped DOM.
   const toRel = (file: string): string => {
-    let root = rootDir;
-    while (root.endsWith('/')) root = root.slice(0, -1);
-    const rel = file.startsWith(root + '/') ? file.slice(root.length + 1) : file;
-    return rel.split('\\').join('/');
+    const rel = relative(rootDir, file);
+    if (!rel || rel.startsWith('..') || isAbsolute(rel)) {
+      return file.split(/[\\/]/).pop() ?? 'unknown';
+    }
+    return rel.split(sep).join('/');
   };
 
   return {
@@ -73,7 +77,7 @@ export default function stampLocBabel(babel: { types: typeof BabelTypes }, opts:
         if (!filename || !loc) return;
 
         if (!hasAttr(node, attrLoc)) {
-          node.attributes.push(attr(attrLoc, `${toRel(filename)}:${loc.start.line}`));
+          node.attributes.push(attr(attrLoc, `${toRel(filename)}:${loc.start.line}:${loc.start.column + 1}`));
         }
         if (!hasAttr(node, attrComp)) {
           const comp = nearestComponentName(path);
