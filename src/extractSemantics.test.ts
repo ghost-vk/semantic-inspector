@@ -29,6 +29,7 @@ describe('extractSemantics — text', () => {
     expect(t).not.toContain('�');
   });
 
+
   it('omits text when empty', () => {
     document.body.innerHTML = `<div id="d" data-comp="D"></div>`;
     expect(extractSemantics(el('d')).text).toBeUndefined();
