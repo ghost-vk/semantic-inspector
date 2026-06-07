@@ -1,3 +1,5 @@
+// node-only: uses node:http (and node:fs/path transitively via annotationStore). Import ONLY from
+// src/vite.ts — never from the browser entry (src/index.ts), or node built-ins leak into the bundle.
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { ANNOTATION_ENDPOINT } from './annotationEndpoint';
 import { readAnnotations, upsert, writeAnnotations } from './annotationStore';
@@ -40,6 +42,10 @@ function parseAnchor(v: unknown): AnnotationAnchor | null {
     if (typeof a.total !== 'number' || !Number.isInteger(a.total) || a.total < 0) return null;
     out.total = a.total;
   }
+  // index/total are a pair everywhere they are produced and consumed: reject a half-populated
+  // anchor (and a nonsensical "index > total") rather than persisting meaningless data.
+  if ((out.index === undefined) !== (out.total === undefined)) return null;
+  if (out.index !== undefined && out.total !== undefined && out.index > out.total) return null;
   if (a.attrs !== undefined) {
     if (typeof a.attrs !== 'object' || a.attrs === null) return null;
     const attrs: Record<string, string> = {};
@@ -104,11 +110,49 @@ function send(res: ServerResponse, status: number, payload: unknown): void {
   res.end(JSON.stringify(payload));
 }
 
+/**
+ * CSRF / cross-origin guard for the file-writing endpoint. The browser is an untrusted client here:
+ * any page the developer visits while the dev server runs could try to POST. Two checks:
+ *
+ *  1. Require `Content-Type: application/json`. A cross-origin `fetch` with this content type is NOT
+ *     a CORS "simple request", so the browser must first send a preflight — which this endpoint never
+ *     answers with CORS headers, so the write is blocked. This closes the drive-by vector.
+ *  2. When an `Origin` header is present, require it to match the request `Host`. Blocks cross-origin
+ *     writes as defense in depth, independent of which address the dev server is bound to (so it does
+ *     not break `vite --host` LAN development the way a loopback-only Host allowlist would).
+ *
+ * Returns an error to send, or null when the request may proceed.
+ */
+function csrfReject(req: IncomingMessage): { status: number; error: string } | null {
+  const contentType = req.headers?.['content-type'] ?? '';
+  if (!contentType.toLowerCase().includes('application/json')) {
+    return { status: 415, error: 'content-type must be application/json' };
+  }
+  const origin = req.headers?.origin;
+  if (origin !== undefined) {
+    let originHost: string;
+    try {
+      originHost = new URL(origin).host;
+    } catch {
+      return { status: 403, error: 'invalid origin' };
+    }
+    if (originHost !== req.headers?.host) {
+      return { status: 403, error: 'cross-origin request forbidden' };
+    }
+  }
+  return null;
+}
+
 export interface MiddlewareOptions {
   endpoint?: string;
   /** Injectable clock for tests. */
   now?: () => string;
 }
+
+// Serialize the read-modify-write of annotations.json across concurrent requests. Each save chains
+// onto the previous one, so two overlapping POSTs cannot both read the same snapshot and lose a
+// write (the read + upsert + write run synchronously inside one link, with no await between them).
+let saveChain: Promise<unknown> = Promise.resolve();
 
 /**
  * Connect-style middleware that persists annotations on POST. The output path is derived ONLY from
@@ -123,6 +167,11 @@ export function createAnnotationMiddleware(rootDir: string, options: MiddlewareO
       next();
       return;
     }
+    const rejection = csrfReject(req);
+    if (rejection) {
+      send(res, rejection.status, { error: rejection.error });
+      return;
+    }
     readBody(req)
       .then((raw) => {
         let body: unknown;
@@ -130,20 +179,34 @@ export function createAnnotationMiddleware(rootDir: string, options: MiddlewareO
           body = JSON.parse(raw);
         } catch {
           send(res, 400, { error: 'invalid JSON' });
-          return;
+          return undefined;
         }
         const input = parseInput(body);
         if (!input) {
           send(res, 400, { error: 'invalid annotation' });
-          return;
+          return undefined;
         }
-        try {
+        // Chain the read-modify-write onto the serialization queue, then keep the queue alive
+        // regardless of outcome so one failed save cannot poison subsequent ones.
+        const job = saveChain.then(() => {
           const updated = upsert(readAnnotations(rootDir), input, now());
           writeAnnotations(rootDir, updated);
-          send(res, 200, updated.annotations[input.name]);
-        } catch {
-          send(res, 500, { error: 'failed to persist annotation' });
-        }
+          return updated.annotations[input.name];
+        });
+        saveChain = job.then(
+          () => undefined,
+          () => undefined
+        );
+        return job.then(
+          (saved) => send(res, 200, saved),
+          (err: unknown) => {
+            // Surface the real cause to the dev server console; the wire response stays generic.
+            console.warn(
+              `[semantic-inspector] failed to persist annotation: ${err instanceof Error ? err.message : String(err)}`
+            );
+            send(res, 500, { error: 'failed to persist annotation' });
+          }
+        );
       })
       .catch(() => send(res, 400, { error: 'bad request body' }));
   };

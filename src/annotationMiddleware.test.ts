@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import type { ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -26,10 +26,12 @@ const validInput = (over: Partial<AnnotationInput> = {}): AnnotationInput => ({
 });
 
 // biome-ignore lint/suspicious/noExplicitAny: lightweight req/res doubles for a connect handler
-function mockReq(method: string, url: string, body?: unknown): any {
+function mockReq(method: string, url: string, body?: unknown, headers: Record<string, string> = {}): any {
   const r = Readable.from([body === undefined ? '' : JSON.stringify(body)]) as any;
   r.method = method;
   r.url = url;
+  // Default to the content type the real client sends; individual tests override to exercise the guard.
+  r.headers = { 'content-type': 'application/json', ...headers };
   return r;
 }
 
@@ -82,6 +84,19 @@ describe('parseInput', () => {
     expect(parseInput(validInput({ name: '__proto__' }))).toBeNull();
     expect(parseInput(validInput({ name: 'constructor' }))).toBeNull();
   });
+
+  it('rejects a half-populated index/total pair', () => {
+    expect(parseInput(validInput({ anchor: { comp: 'X', index: 1 } }))).toBeNull();
+    expect(parseInput(validInput({ anchor: { comp: 'X', total: 3 } }))).toBeNull();
+  });
+
+  it('rejects index greater than total', () => {
+    expect(parseInput(validInput({ anchor: { comp: 'X', index: 5, total: 2 } }))).toBeNull();
+  });
+
+  it('accepts a valid index/total pair', () => {
+    expect(parseInput(validInput({ anchor: { comp: 'X', index: 2, total: 5 } }))?.anchor.index).toBe(2);
+  });
 });
 
 describe('createAnnotationMiddleware', () => {
@@ -105,6 +120,63 @@ describe('createAnnotationMiddleware', () => {
     expect(r1.next).toHaveBeenCalled();
     const r2 = await run(mockReq('POST', '/something-else'), mockRes());
     expect(r2.next).toHaveBeenCalled();
+  });
+
+  it.each(['PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'])('falls through for %s on the endpoint', async (method) => {
+    const r = await run(mockReq(method, ANNOTATION_ENDPOINT, validInput()), mockRes());
+    expect(r.next).toHaveBeenCalled();
+  });
+
+  it('rejects a POST without an application/json content-type (415)', async () => {
+    const res = mockRes();
+    await run(mockReq('POST', ANNOTATION_ENDPOINT, validInput(), { 'content-type': 'text/plain' }), res);
+    expect(res._status).toBe(415);
+  });
+
+  it('rejects a cross-origin POST where Origin does not match Host (403)', async () => {
+    const res = mockRes();
+    await run(
+      mockReq('POST', ANNOTATION_ENDPOINT, validInput(), {
+        origin: 'http://evil.example',
+        host: 'localhost:5173'
+      }),
+      res
+    );
+    expect(res._status).toBe(403);
+  });
+
+  it('allows a same-origin POST where Origin matches Host', async () => {
+    const res = mockRes();
+    await run(
+      mockReq('POST', ANNOTATION_ENDPOINT, validInput(), {
+        origin: 'http://localhost:5173',
+        host: 'localhost:5173'
+      }),
+      res
+    );
+    expect(res._status).toBe(200);
+  });
+
+  it('responds 500 when the write fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Put a regular file where the .semantic-inspector directory must be created → mkdir/write fails.
+    writeFileSync(annotationPaths(dir).dir, 'x', 'utf8');
+    const res = mockRes();
+    await run(mockReq('POST', ANNOTATION_ENDPOINT, validInput()), res);
+    expect(res._status).toBe(500);
+    expect(JSON.parse(res._body).error).toBe('failed to persist annotation');
+    warn.mockRestore();
+  });
+
+  it('serializes concurrent POSTs without losing a write', async () => {
+    const mw = createAnnotationMiddleware(dir, { now: () => '2026-01-01T00:00:00.000Z' });
+    // biome-ignore lint/suspicious/noExplicitAny: req/res doubles
+    mw(mockReq('POST', ANNOTATION_ENDPOINT, validInput({ name: 'a' })) as any, mockRes() as any, vi.fn());
+    // biome-ignore lint/suspicious/noExplicitAny: req/res doubles
+    mw(mockReq('POST', ANNOTATION_ENDPOINT, validInput({ name: 'b' })) as any, mockRes() as any, vi.fn());
+    await new Promise((r) => setTimeout(r, 10));
+    const stored = JSON.parse(readFileSync(annotationPaths(dir).json, 'utf8'));
+    expect(Object.keys(stored.annotations).sort()).toEqual(['a', 'b']);
   });
 
   it('routes on a custom endpoint when configured', async () => {
