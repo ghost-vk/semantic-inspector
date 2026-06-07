@@ -22,8 +22,8 @@ Open the URL Vite prints (default http://localhost:5173).
    the component path (`App › Sidebar › NavItem`), and the `data-testid`.
 2. **Copy** — click to copy the text identifier; <kbd>Shift</kbd>+click to copy a PNG of the
    element. (Both go to the clipboard; see the console for the `onCopy` log.)
-3. **Annotate** — press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>, click the Russian "Рубрики"
-   item, name it `пилюля`, Save. Then open
+3. **Annotate** — press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd>, click the "Topics" sidebar
+   item, name it `pill`, Save. Then open
    [`.semantic-inspector/annotations.md`](./.semantic-inspector/annotations.md) — the element is now
    addressable by name, anchored on a durable descriptor (not a raw line number).
 4. <kbd>Esc</kbd> exits either mode.

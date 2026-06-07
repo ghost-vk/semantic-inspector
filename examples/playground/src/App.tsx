@@ -11,8 +11,8 @@ function Legend(): JSX.Element {
         <kbd>Shift</kbd>+click copies a screenshot.
       </li>
       <li>
-        <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> — annotate: click an element to give it a name (try naming a
-        Russian item "пилюля").
+        <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> — annotate: click an element to give it a name (e.g. name the
+        "Topics" link "pill").
       </li>
       <li>
         <kbd>Esc</kbd> — exit either mode.
@@ -34,13 +34,13 @@ export function App(): JSX.Element {
           <Toolbar />
           <div className="cards">
             <ContentCard
-              title="Лента"
-              body="Свежие материалы по вашим подпискам. Click me in inspect mode to copy the path."
-              link={{ label: 'Открыть ленту', href: '/feed' }}
+              title="Feed"
+              body="Fresh items from your subscriptions. Click me in inspect mode to copy the path."
+              link={{ label: 'Open feed', href: '/feed' }}
             />
             <ContentCard
               title="Settings"
-              body="Account preferences and notifications. Смешанный текст на двух языках."
+              body="Account preferences and notifications. Inspect this card to see its component path."
               link={{ label: 'Manage account', href: '/settings/account' }}
             />
           </div>
