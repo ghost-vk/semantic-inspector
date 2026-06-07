@@ -1,0 +1,106 @@
+{
+  "name": "semantic-inspector",
+  "version": "0.1.0",
+  "description": "Dev-only React inspector: a hotkey highlights elements and click-copies their `Component — file:line` (or a PNG screenshot) for fast context handoff to AI coding assistants.",
+  "type": "module",
+  "license": "MIT",
+  "author": "chains.subplot03@icloud.com",
+  "keywords": [
+    "react",
+    "vite",
+    "vite-plugin",
+    "babel",
+    "babel-plugin",
+    "devtools",
+    "inspector",
+    "jsx",
+    "source-location",
+    "data-loc",
+    "vibe-coding",
+    "ai",
+    "screenshot",
+    "clipboard"
+  ],
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./vite": {
+      "import": {
+        "types": "./dist/vite.d.ts",
+        "default": "./dist/vite.js"
+      },
+      "require": {
+        "types": "./dist/vite.d.cts",
+        "default": "./dist/vite.cjs"
+      }
+    },
+    "./babel": {
+      "import": {
+        "types": "./dist/babel.d.ts",
+        "default": "./dist/babel.js"
+      },
+      "require": {
+        "types": "./dist/babel.d.cts",
+        "default": "./dist/babel.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18",
+    "vite": ">=4"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@babel/core": "^7.25.0",
+    "modern-screenshot": "^4.7.0"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.2",
+    "@types/babel__core": "^7.20.5",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.0.0",
+    "happy-dom": "^20.9.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.5.0",
+    "vite": "^8.0.0",
+    "vitest": "^4.1.4"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
