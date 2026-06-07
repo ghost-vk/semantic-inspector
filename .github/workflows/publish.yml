@@ -1,29 +1,68 @@
 name: Publish
 
-# Publishes to npm when a GitHub Release is published.
-# Tag the release vX.Y.Z and keep package.json "version" in sync.
+# Publishes to npm via OIDC Trusted Publishing when a GitHub Release is published.
+# Prerequisite: configure a Trusted Publisher (this repo + this workflow) on npmjs.com, then
+# delete any legacy NPM_TOKEN secret. Tag the release vX.Y.Z; the tag is verified against
+# package.json "version" below. See RELEASING.md.
 on:
   release:
     types: [published]
 
 permissions:
   contents: read
-  id-token: write # required for npm provenance
+  id-token: write # required for npm provenance + OIDC Trusted Publishing
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: npm-production
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
           cache: npm
+      # OIDC Trusted Publishing needs npm >= 11.5.
+      - run: npm install -g npm@latest
       - run: npm ci
+      - name: Verify release tag matches package.json version
+        run: |
+          PKG=$(node -p "require('./package.json').version")
+          TAG=${GITHUB_REF_NAME#v}
+          if [ "$PKG" != "$TAG" ]; then
+            echo "::error::Release tag $GITHUB_REF_NAME does not match package.json version $PKG"
+            exit 1
+          fi
       - run: npm run typecheck
       - run: npm test
-      # prepublishOnly builds dist/; --provenance needs the id-token permission above.
+      - run: npm run build
+      - run: npm run lint:pkg
+      - run: npm run test:dist
+      # OIDC mints a short-lived token in-job; no NPM_TOKEN needed.
       - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  verify-published:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: Install the published version from npm and smoke-test it
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          mkdir -p /tmp/smoke && cd /tmp/smoke
+          npm init -y >/dev/null
+          npm i "semantic-inspector@$VERSION" @babel/core
+          node -e "const b = require('semantic-inspector/babel'); if (typeof b.stampLocBabel !== 'function') { throw new Error('babel entry not callable'); }"
+          node --input-type=module -e "import('semantic-inspector').then((m) => { if (!m.SemanticInspector || !m.useInspector) { process.exit(1); } })"

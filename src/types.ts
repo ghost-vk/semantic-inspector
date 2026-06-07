@@ -1,23 +1,43 @@
 export type CopyKind = 'text' | 'screenshot';
 
-export interface InspectTarget {
-  /** Имя компонента (data-comp) или fallback (fiber displayName / имя файла / тег). */
+/** Component name + source location resolved for an inspected element. */
+export interface LocInfo {
+  /** Component name (from data-comp) or a fallback (fiber displayName / file name / tag). */
   comp: string;
-  /** "<path>:<line>" из data-loc, либо null если элемент не заштампован. */
+  /** "<path>:<line>:<col>" from data-loc, or null when the element is not stamped. */
   loc: string | null;
-  /** Реальный DOM-элемент (ближайший с data-loc, либо сам). */
+}
+
+export interface InspectTarget extends LocInfo {
+  /** The resolved DOM element (nearest ancestor with data-loc, or the element itself). */
   el: Element;
-  /** Геометрия для оверлея. */
+  /** Geometry for the overlay highlight. */
   rect: DOMRect;
 }
 
 export interface SemanticInspectorProps {
-  /** Хоткей-toggle. Default 'Alt+Shift+S'. Формат: 'Alt+Shift+S', 'Ctrl+Cmd+I'. */
+  /**
+   * Toggle hotkey. Default 'Alt+Shift+S'.
+   *
+   * Format: modifiers (`Alt`, `Shift`, `Ctrl`/`Control`, `Meta`/`Cmd`) joined with `+`
+   * followed by a final key, e.g. 'Ctrl+Cmd+I'. Matching is case-insensitive and also
+   * accepts the physical `event.code` (so layout-shifted glyphs still work). `Esc` always exits.
+   */
   hotkey?: string;
-  /** Формат текста для буфера. Default: `${comp} — ${loc}` (или `${comp}` без loc). */
-  formatText?: (t: { comp: string; loc: string | null }) => string;
-  /** Колбэк после успешной копии — для телеметрии/тостов апа. */
+  /** Formats the clipboard text. Default: `${comp} — ${loc}` (or `${comp}` when loc is null). */
+  formatText?: (t: LocInfo) => string;
+  /**
+   * Called after a successful copy. For kind `'text'`, `payload` is the copied string; for
+   * kind `'screenshot'`, `payload` is the component name (the PNG itself goes to the clipboard,
+   * not to this callback).
+   */
   onCopy?: (kind: CopyKind, payload: string) => void;
-  /** Колбэк при ошибке копии (clipboard reject / screenshot fail). */
+  /** Called when a copy fails (clipboard rejection / screenshot failure). */
   onError?: (kind: CopyKind, err: unknown) => void;
+}
+
+/** Return value of `useInspector`. */
+export interface UseInspectorResult {
+  active: boolean;
+  target: InspectTarget | null;
 }
