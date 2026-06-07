@@ -107,6 +107,26 @@ describe('createAnnotationMiddleware', () => {
     expect(r2.next).toHaveBeenCalled();
   });
 
+  it('routes on a custom endpoint when configured', async () => {
+    const res = mockRes();
+    const next = vi.fn();
+    createAnnotationMiddleware(dir, { endpoint: '/custom', now: () => '2026-01-01T00:00:00.000Z' })(
+      // biome-ignore lint/suspicious/noExplicitAny: req/res doubles
+      mockReq('POST', '/custom', validInput()) as any,
+      // biome-ignore lint/suspicious/noExplicitAny: req/res doubles
+      res as any,
+      next
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    expect(res._status).toBe(200);
+  });
+
+  it('rejects an oversized body', async () => {
+    const res = mockRes();
+    await run(mockReq('POST', ANNOTATION_ENDPOINT, validInput({ note: 'x'.repeat(300 * 1024) })), res);
+    expect(res._status).toBe(400);
+  });
+
   it('keeps the output path inside rootDir regardless of name (no traversal)', async () => {
     const res = mockRes();
     await run(mockReq('POST', ANNOTATION_ENDPOINT, validInput({ name: '../../etc/passwd' })), res);

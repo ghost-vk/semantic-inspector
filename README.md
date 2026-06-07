@@ -217,6 +217,7 @@ so failures only surface via `console.warn` unless you pass one.
 | ---------- | ---------------- | ------------ | ---------------------------------------------- |
 | `rootDir`  | `process.cwd()`  | both         | base for the relative path written into `data-loc` |
 | `include`  | `/\.[jt]sx$/`    | `/vite` only | which module ids get stamped                   |
+| `annotateEndpoint` | `'/__semantic_inspector/annotations'` | `/vite` only | path the annotate middleware listens on; must match the `<SemanticInspector annotateEndpoint>` prop |
 | `attrLoc`  | `'data-loc'`     | both         | attribute name for `path:line:col`             |
 | `attrComp` | `'data-comp'`    | both         | attribute name for the component name          |
 

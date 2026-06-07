@@ -73,6 +73,17 @@ describe('annotationStore', () => {
     expect(md).not.toContain('last seen');
   });
 
+  it('keeps interpolated values single-line so the mirror cannot be markdown-injected', () => {
+    const file = upsert(
+      { version: 1, annotations: {} },
+      input({ name: 'evil', note: 'line1\n## Injected heading\nline2' }),
+      '2026-01-01T00:00:00.000Z'
+    );
+    const md = renderMarkdown(file);
+    // Only the real annotation name is a heading; the injected "## " is flattened into the note line.
+    expect(md.match(/^##\s/gm)?.length).toBe(1);
+  });
+
   it('throws on malformed JSON (never silently overwrites)', () => {
     const { dir: d, json } = annotationPaths(dir);
     mkdirSync(d, { recursive: true });

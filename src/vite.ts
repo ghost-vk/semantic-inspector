@@ -6,6 +6,8 @@ import { type StampLocOptions, stampLocBabel } from './stampLocBabel';
 export interface StampLocViteOptions extends StampLocOptions {
   /** Which files to stamp. Default /\.[jt]sx$/. */
   include?: RegExp;
+  /** Path the annotation middleware listens on. Must match the SemanticInspector `annotateEndpoint` prop. Default '/__semantic_inspector/annotations'. */
+  annotateEndpoint?: string;
 }
 
 /**
@@ -32,7 +34,7 @@ export function stampLocVite(opts: StampLocViteOptions = {}): Plugin {
     enforce: 'pre',
     apply: 'serve',
     configureServer(server) {
-      server.middlewares.use(createAnnotationMiddleware(rootDir));
+      server.middlewares.use(createAnnotationMiddleware(rootDir, { endpoint: opts.annotateEndpoint }));
     },
     async transform(code, id) {
       const file = id.split('?')[0];

@@ -32,6 +32,11 @@ export function upsert(file: AnnotationFile, input: AnnotationInput, now: string
   return { version: 1, annotations: { ...file.annotations, [input.name]: next } };
 }
 
+// Keep interpolated values on one line so a stray newline can't forge a new "## " section in the mirror.
+function inline(s: string): string {
+  return s.replace(/\s*\r?\n\s*/g, ' ');
+}
+
 /** Render the human/Graphify-readable Markdown mirror. Pure. */
 export function renderMarkdown(file: AnnotationFile): string {
   const lines: string[] = [
@@ -42,11 +47,11 @@ export function renderMarkdown(file: AnnotationFile): string {
   ];
   for (const name of Object.keys(file.annotations).sort()) {
     const a = file.annotations[name];
-    lines.push(`## ${name}`, '');
-    if (a.tags?.length) lines.push(`- **tags:** ${a.tags.join(', ')}`);
-    const pathStr = a.anchor.path?.length ? ` (${a.anchor.path.join(' › ')})` : '';
-    lines.push(`- **component:** ${a.anchor.comp}${pathStr}`);
-    if (a.anchor.text) lines.push(`- **text:** "${a.anchor.text}"`);
+    lines.push(`## ${inline(name)}`, '');
+    if (a.tags?.length) lines.push(`- **tags:** ${a.tags.map(inline).join(', ')}`);
+    const pathStr = a.anchor.path?.length ? ` (${a.anchor.path.map(inline).join(' › ')})` : '';
+    lines.push(`- **component:** ${inline(a.anchor.comp)}${pathStr}`);
+    if (a.anchor.text) lines.push(`- **text:** "${inline(a.anchor.text)}"`);
     if (a.anchor.index != null && a.anchor.total != null) {
       lines.push(`- **index:** ${a.anchor.index}/${a.anchor.total}`);
     }
@@ -55,8 +60,8 @@ export function renderMarkdown(file: AnnotationFile): string {
         lines.push(`- **${k === 'data-testid' ? 'testid' : k}:** ${v}`);
       }
     }
-    if (a.lastSeen.loc) lines.push(`- **last seen:** ${a.lastSeen.loc} _(hint — may be stale, verify)_`);
-    if (a.note) lines.push(`- **note:** ${a.note}`);
+    if (a.lastSeen.loc) lines.push(`- **last seen:** ${inline(a.lastSeen.loc)} _(hint — may be stale, verify)_`);
+    if (a.note) lines.push(`- **note:** ${inline(a.note)}`);
     lines.push('');
   }
   return lines.join('\n');
