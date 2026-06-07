@@ -1,12 +1,36 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { copyElementShot, copyText } from './clipboard';
+import { extractSemantics } from './extractSemantics';
 import { resolveTarget } from './resolveTarget';
-import type { CopyKind, InspectTarget, LocInfo, SemanticInspectorProps, UseInspectorResult } from './types';
+import type {
+  CopyKind,
+  InspectTarget,
+  LocInfo,
+  SemanticInfo,
+  SemanticInspectorProps,
+  UseInspectorResult
+} from './types';
 
 const DEFAULT_HOTKEY = 'Alt+Shift+S';
 
 function defaultFormat(t: LocInfo): string {
   return t.loc ? `${t.comp} — ${t.loc}` : t.comp;
+}
+
+// data-testid reads better as "testid"; other whitelisted attrs use their own name.
+function attrLabel(name: string): string {
+  return name === 'data-testid' ? 'testid' : name;
+}
+
+function semanticFormat(t: SemanticInfo): string {
+  const lines = [t.loc ? `${t.comp} — ${t.loc}` : t.comp];
+  if (t.text) lines.push(`text: "${t.text}"`);
+  if (t.index && t.total) lines.push(`index: ${t.index}/${t.total}`);
+  if (t.path?.length) lines.push(`path: ${t.path.join(' › ')}`);
+  if (t.attrs) {
+    for (const [k, v] of Object.entries(t.attrs)) lines.push(`${attrLabel(k)}: ${v}`);
+  }
+  return lines.join('\n');
 }
 
 interface Hotkey {
@@ -131,7 +155,7 @@ export function useInspector(opts: SemanticInspectorProps = {}): UseInspectorRes
       if (!t) return;
       e.preventDefault();
       e.stopPropagation();
-      const { formatText = defaultFormat, onCopy, onError } = cbRef.current;
+      const { formatText, onCopy, onError, semantic = false } = cbRef.current;
       const done = (kind: CopyKind, payload: string): void => onCopy?.(kind, payload);
       const fail = (kind: CopyKind, err: unknown): void => {
         if (onError) onError(kind, err);
@@ -151,7 +175,9 @@ export function useInspector(opts: SemanticInspectorProps = {}): UseInspectorRes
             shotInFlight = false;
           });
       } else {
-        const text = formatText({ comp: t.comp, loc: t.loc });
+        const info: SemanticInfo = semantic ? extractSemantics(t.el) : { comp: t.comp, loc: t.loc };
+        const fmt: (i: SemanticInfo) => string = formatText ?? (semantic ? semanticFormat : defaultFormat);
+        const text = fmt(info);
         copyText(text).then(
           () => done('text', text),
           (err: unknown) => fail('text', err)
