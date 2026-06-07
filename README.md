@@ -15,9 +15,9 @@ when you gate and lazy-load it** (see [Mount it](#2-mount-it-behind-your-own-dev
 
 ## Demo
 
-<video src="https://github.com/ghost-vk/semantic-inspector/raw/main/docs/demo.mp4" controls muted loop width="600"></video>
+[![demo](https://raw.githubusercontent.com/ghost-vk/semantic-inspector/main/docs/demo.gif)](https://github.com/ghost-vk/semantic-inspector/blob/main/docs/demo.mp4)
 
-_Player not loading? [Watch the demo.](https://github.com/ghost-vk/semantic-inspector/raw/main/docs/demo.mp4)_
+_Click for the full-resolution video._
 
 ## Install
 
