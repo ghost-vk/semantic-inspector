@@ -83,6 +83,42 @@ Everything is read at click time, so hover stays cheap and the overlay tip is un
 > meant to be pasted into an AI chat. Avoid `semantic` on screens showing secrets or PII (tokens in
 > URLs, personal data in labels) — or strip those fields with a custom `formatText`.
 
+## Annotate mode (opt-in)
+
+Beyond copying a pointer, you can give an element a durable, human-friendly name so you and an AI
+share the same vocabulary later — without re-inspecting. Enable it and press the annotate hotkey
+(default `Alt+Shift+A`) to enter annotate mode; click an element to open an inline editor for a
+**name** (+ optional **tags** and a **note**):
+
+```tsx
+<SemanticInspector annotate onAnnotate={(a) => toast(`saved ${a.name}`)} />
+```
+
+Saving POSTs to a dev-server endpoint that the Vite plugin adds (`configureServer`, dev only) and
+writes two files at your project root:
+
+- `.semantic-inspector/annotations.json` — source of truth (upserted by name).
+- `.semantic-inspector/annotations.md` — a regenerated, human/Graphify-readable mirror.
+
+Each annotation is anchored on a **durable descriptor** — the same signals as the semantic payload
+(component, visible text, sibling index, component path, and stable attributes such as
+`data-testid`) — not on `file:line:col`. The line/file is kept only as a `lastSeen` hint. So when an
+AI later needs "the пилюля," it reads the file and re-finds the element by grepping the stable
+signals (testid → id → visible text + component), which survive refactors far better than a line
+number.
+
+Commit `.semantic-inspector/` to share the vocabulary with your team and your AI.
+
+> **Note:** annotations store the element's visible text, your note, and stable attributes
+> (including `href`) in a repo file. Avoid annotating elements whose text/URL contains secrets or
+> PII, and review `.semantic-inspector/annotations.json` before committing.
+
+### How an AI resolves a name
+
+Given a name (e.g. "пилюля"): read `.semantic-inspector/annotations.json`, find the entry, then grep
+the live code in decreasing order of stability — `data-testid` → `id`/`name`/`href` → visible
+`text` near the `data-comp`. Treat `lastSeen.loc` as a first guess only; verify it.
+
 ## Three entry points
 
 | Import                     | What it is                                                          |
@@ -156,6 +192,10 @@ const SemanticInspector = lazy(() =>
 | ------------ | ------------------------ | ----------------------------------------- |
 | `hotkey`     | `'Alt+Shift+S'`          | toggle inspect mode (Esc always exits)    |
 | `semantic`   | `false`                  | enrich the copied text with visible label, sibling index, component path, and key attributes (see [Semantic payload](#semantic-payload-opt-in)) |
+| `annotate`   | `false`                  | enable annotate mode: a hotkey opens an inline editor to name an element; the annotation is persisted to `.semantic-inspector/` via the dev plugin (see [Annotate mode](#annotate-mode-opt-in)) |
+| `annotateHotkey` | `'Alt+Shift+A'`      | hotkey that toggles annotate mode |
+| `annotateEndpoint` | `'/__semantic_inspector/annotations'` | override the POST endpoint path |
+| `onAnnotate` | —                        | called with the saved annotation after a successful save |
 | `formatText` | `` `${comp} — ${loc}` `` | format of the text copied on click; receives `SemanticInfo` (the extra fields are populated only when `semantic` is on; `loc` may be `null`) |
 | `onCopy`     | —                        | called after a successful copy            |
 | `onError`    | —                        | called on a clipboard/screenshot failure  |
