@@ -53,6 +53,32 @@ flowchart LR
   C -->|"Shift+click"| F["clipboard: PNG (modern-screenshot)"]
 ```
 
+## Semantic payload (opt-in)
+
+By default a click copies one line: `Component — file:line:col`. Pass `semantic` to copy a
+self-describing block instead — handy so an AI knows *which* element you meant without extra
+explanation:
+
+```tsx
+<SemanticInspector semantic />
+```
+
+Clicking the "Рубрики" item then copies:
+
+```
+NavItem — src/components/Navigation/Sidebar.tsx:93:15
+text: "Рубрики"
+index: 2/5
+path: App › Sidebar › NavItem
+testid: nav-rubrics
+```
+
+Fields are added only when meaningful (e.g. `index` is dropped for a lone element). The visible
+text is whitespace-collapsed and capped at 160 chars; the component path keeps the 4 nearest
+`data-comp` ancestors; attributes are limited to `id`, `data-testid`, `name`, `href`, `type`.
+Everything is read at click time, so hover stays cheap and the overlay tip is unchanged. A custom
+`formatText` receives the full `SemanticInfo` object when `semantic` is on.
+
 ## Three entry points
 
 | Import                     | What it is                                                          |
@@ -125,7 +151,8 @@ const SemanticInspector = lazy(() =>
 | prop         | default                  | purpose                                   |
 | ------------ | ------------------------ | ----------------------------------------- |
 | `hotkey`     | `'Alt+Shift+S'`          | toggle inspect mode (Esc always exits)    |
-| `formatText` | `` `${comp} — ${loc}` `` | format of the text copied on click; receives `{ comp, loc }` (`loc` may be `null`) |
+| `semantic`   | `false`                  | enrich the copied text with visible label, sibling index, component path, and key attributes (see [Semantic payload](#semantic-payload-opt-in)) |
+| `formatText` | `` `${comp} — ${loc}` `` | format of the text copied on click; receives `SemanticInfo` (the extra fields are populated only when `semantic` is on; `loc` may be `null`) |
 | `onCopy`     | —                        | called after a successful copy            |
 | `onError`    | —                        | called on a clipboard/screenshot failure  |
 
