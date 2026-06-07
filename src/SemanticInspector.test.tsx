@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./clipboard', () => ({
@@ -6,6 +6,9 @@ vi.mock('./clipboard', () => ({
   copyElementShot: vi.fn(async () => {})
 }));
 
+vi.mock('./annotationClient', () => ({ saveAnnotation: vi.fn() }));
+
+import { saveAnnotation } from './annotationClient';
 import { copyText } from './clipboard';
 import { SemanticInspector } from './SemanticInspector';
 
@@ -78,5 +81,51 @@ describe('SemanticInspector', () => {
       vi.advanceTimersByTime(1400);
     });
     expect(screen.queryByText(/✓ Foo/)).toBeNull();
+  });
+});
+
+const ANNOTATE_KEY: KeyboardEventInit = { key: 'a', code: 'KeyA', altKey: true, shiftKey: true };
+
+function annotatable(): HTMLElement {
+  document.body.innerHTML = `<button id="t" data-comp="NavItem" data-loc="src/S.tsx:1:1" data-testid="nav">Рубрики</button>`;
+  return document.getElementById('t') as HTMLElement;
+}
+
+describe('SemanticInspector — annotate', () => {
+  it('opens the editor on click in annotate mode and saves', async () => {
+    vi.mocked(saveAnnotation).mockResolvedValue({
+      name: 'пилюля',
+      anchor: { comp: 'NavItem' },
+      lastSeen: { file: null, loc: null },
+      createdAt: 't',
+      updatedAt: 't'
+    });
+    const el = annotatable();
+    const onAnnotate = vi.fn();
+    render(<SemanticInspector annotate onAnnotate={onAnnotate} />);
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', ANNOTATE_KEY));
+    });
+    vi.spyOn(document, 'elementFromPoint').mockReturnValue(el);
+    await act(async () => {
+      window.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: 1, clientY: 1 }));
+    });
+
+    fireEvent.change(screen.getByLabelText('annotation name'), { target: { value: 'пилюля' } });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Save'));
+    });
+
+    expect(saveAnnotation).toHaveBeenCalledOnce();
+    expect(onAnnotate).toHaveBeenCalledWith(expect.objectContaining({ name: 'пилюля' }));
+  });
+
+  it('does not wire the annotate hotkey when annotate is not set', () => {
+    render(<SemanticInspector />);
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', ANNOTATE_KEY));
+    });
+    expect(screen.queryByLabelText('annotation name')).toBeNull();
   });
 });

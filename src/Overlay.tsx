@@ -1,5 +1,5 @@
 import { type CSSProperties, type JSX, type MemoExoticComponent, memo } from 'react';
-import type { InspectTarget } from './types';
+import type { InspectMode, InspectTarget } from './types';
 
 // Just below the 32-bit max so the overlay wins stacking contests, with a small reserved band:
 // Z = highlight box, Z+1 = tip, Z+2 = badge/toast.
@@ -71,15 +71,19 @@ function tipStyle(r: DOMRect): CSSProperties {
 interface OverlayProps {
   target: InspectTarget | null;
   toast: string | null;
+  mode?: InspectMode;
 }
 
 export const Overlay: MemoExoticComponent<(props: OverlayProps) => JSX.Element> = memo(function Overlay({
   target,
-  toast
+  toast,
+  mode
 }: OverlayProps): JSX.Element {
+  const badgeText =
+    mode === 'annotate' ? '✏️ annotate · click=name · Esc=exit' : '⌖ inspect · click=copy · ⇧click=shot · Esc=exit';
   return (
     <>
-      <div style={badge}>⌖ inspect · click=name · ⇧click=shot · Esc=exit</div>
+      <div style={badge}>{badgeText}</div>
       {target && (
         <>
           <div style={boxStyle(target.rect)} />
