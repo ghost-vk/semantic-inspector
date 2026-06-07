@@ -70,6 +70,9 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
+    "dev:example": "vite --config examples/playground/vite.config.ts",
+    "build:example": "vite build --config examples/playground/vite.config.ts",
+    "typecheck:example": "tsc -p examples/playground/tsconfig.json --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "typecheck": "tsc --noEmit",

@@ -25,7 +25,7 @@ CI gates are only enforcing if `main` is protected:
 1. Repo **Settings → Branches → Add rule** for `main`.
 2. Require a pull request before merging.
 3. Require status checks to pass, selecting: `lint-and-typecheck`, `test (20)`, `test (22)`,
-   `test (24)`, `package`.
+   `test (24)`, `package`, `example`.
 4. Require branches to be up to date before merging.
 
 ### 3. GitHub Environment

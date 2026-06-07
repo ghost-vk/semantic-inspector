@@ -57,3 +57,19 @@ jobs:
       - run: npm run build
       - run: npm run lint:pkg
       - run: npm run test:dist
+
+  example:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: lint-and-typecheck
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The playground consumes the package's live source via Vite aliases; typecheck + build it so
+      # a breaking package API or resolution change fails before merge.
+      - run: npm run typecheck:example
+      - run: npm run build:example

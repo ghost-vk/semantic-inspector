@@ -8,3 +8,5 @@ dist/
 coverage/
 *.tsbuildinfo
 .full-review/
+.semantic-inspector/
+examples/playground/dist/
