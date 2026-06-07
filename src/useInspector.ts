@@ -197,5 +197,5 @@ export function useInspector(opts: SemanticInspectorProps = {}): UseInspectorRes
     };
   }, [active]);
 
-  return { active, target };
+  return { active, mode: active ? 'inspect' : 'off', target, draft: null, closeDraft: () => {} };
 }

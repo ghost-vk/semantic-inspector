@@ -27,6 +27,58 @@ export interface SemanticInfo extends LocInfo {
   attrs?: Record<string, string>;
 }
 
+/** Durable signals describing an annotated element, used to re-find it after refactors. */
+export interface AnnotationAnchor {
+  comp: string;
+  path?: string[];
+  text?: string;
+  index?: number;
+  total?: number;
+  attrs?: Record<string, string>;
+}
+
+/** A non-authoritative pointer to where the element was last seen. May be stale. */
+export interface AnnotationLastSeen {
+  /** Relative file path (no line/col), or null when unstamped. */
+  file: string | null;
+  /** "<path>:<line>:<col>" snapshot, or null when unstamped. Hint only — verify before trusting. */
+  loc: string | null;
+}
+
+/** One named annotation as persisted on disk. */
+export interface Annotation {
+  name: string;
+  tags?: string[];
+  note?: string;
+  anchor: AnnotationAnchor;
+  lastSeen: AnnotationLastSeen;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** On-disk shape of annotations.json. */
+export interface AnnotationFile {
+  version: 1;
+  annotations: Record<string, Annotation>;
+}
+
+/** Payload the browser POSTs; the server adds timestamps and persists. */
+export interface AnnotationInput {
+  name: string;
+  tags?: string[];
+  note?: string;
+  anchor: AnnotationAnchor;
+  lastSeen: AnnotationLastSeen;
+}
+
+/** Inspector mode. Inspect and annotate are mutually exclusive. */
+export type InspectMode = 'off' | 'inspect' | 'annotate';
+
+/** Set when the user clicked an element in annotate mode (the editor is open). */
+export interface AnnotationDraft {
+  target: InspectTarget;
+}
+
 export interface InspectTarget extends LocInfo {
   /** The resolved DOM element (nearest ancestor with data-loc, or the element itself). */
   el: Element;
@@ -62,10 +114,24 @@ export interface SemanticInspectorProps {
   onCopy?: (kind: CopyKind, payload: string) => void;
   /** Called when a copy fails (clipboard rejection / screenshot failure). */
   onError?: (kind: CopyKind, err: unknown) => void;
+  /** Enable annotate mode. Default false — no annotate hotkey, no editor, no network. */
+  annotate?: boolean;
+  /** Hotkey that toggles annotate mode. Default 'Alt+Shift+A'. */
+  annotateHotkey?: string;
+  /** Override the POST endpoint path. Default '/__semantic_inspector/annotations'. */
+  annotateEndpoint?: string;
+  /** Called after a successful annotation save. */
+  onAnnotate?: (annotation: Annotation) => void;
 }
 
 /** Return value of `useInspector`. */
 export interface UseInspectorResult {
+  /** Back-compat: true whenever a mode is active (`mode !== 'off'`). */
   active: boolean;
+  mode: InspectMode;
   target: InspectTarget | null;
+  /** Non-null while the annotation editor is open. */
+  draft: AnnotationDraft | null;
+  /** Close the editor. */
+  closeDraft: () => void;
 }
