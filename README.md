@@ -13,6 +13,12 @@ Stack: Vite + `@vitejs/plugin-react` + React 18/19. Designed to add **no product
 when you gate and lazy-load it** (see [Mount it](#2-mount-it-behind-your-own-dev-flag-ideally-lazy)) —
 `modern-screenshot` is loaded lazily and the source-stamping plugin runs only on the dev server.
 
+## Demo
+
+<video src="https://github.com/ghost-vk/semantic-inspector/raw/main/docs/demo.mp4" controls muted loop width="600"></video>
+
+_Player not loading? [Watch the demo.](https://github.com/ghost-vk/semantic-inspector/raw/main/docs/demo.mp4)_
+
 ## Install
 
 ```sh
