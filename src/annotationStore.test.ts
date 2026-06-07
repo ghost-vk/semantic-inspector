@@ -84,10 +84,37 @@ describe('annotationStore', () => {
     expect(md.match(/^##\s/gm)?.length).toBe(1);
   });
 
+  it('escapes Markdown control characters in field values (no structural injection)', () => {
+    const file = upsert(
+      { version: 1, annotations: {} },
+      input({ name: 'x', note: '`code` *bold* [link](u) <b>' }),
+      '2026-01-01T00:00:00.000Z'
+    );
+    const md = renderMarkdown(file);
+    expect(md).toContain('\\`code\\`');
+    expect(md).toContain('\\*bold\\*');
+    expect(md).toContain('\\[link\\]');
+    expect(md).toContain('\\<b\\>');
+  });
+
   it('throws on malformed JSON (never silently overwrites)', () => {
     const { dir: d, json } = annotationPaths(dir);
     mkdirSync(d, { recursive: true });
     writeFileSync(json, '{ not json', 'utf8');
+    expect(() => readAnnotations(dir)).toThrow();
+  });
+
+  it('throws on a well-formed file with an unexpected version (no silent downgrade)', () => {
+    const { dir: d, json } = annotationPaths(dir);
+    mkdirSync(d, { recursive: true });
+    writeFileSync(json, JSON.stringify({ version: 2, annotations: {} }), 'utf8');
+    expect(() => readAnnotations(dir)).toThrow();
+  });
+
+  it('throws when annotations is not an object', () => {
+    const { dir: d, json } = annotationPaths(dir);
+    mkdirSync(d, { recursive: true });
+    writeFileSync(json, JSON.stringify({ version: 1, annotations: [] }), 'utf8');
     expect(() => readAnnotations(dir)).toThrow();
   });
 });
