@@ -105,16 +105,17 @@ unit-test without temp dirs or fixtures-on-disk.
 | File | Responsibility | Side |
 | --- | --- | --- |
 | `src/staticAnchors.ts` (new) | `staticAnchors(file, source): StaticElement[]` — `parseSync` the file, walk JSX host elements, emit the static analog of `extractSemantics` (loc, comp, path, literal text, literal whitelisted attrs). Returns `[]` for files with no JSX. | node |
-| `src/collectSourceFiles.ts` (new) | `collectSourceFiles(root, include?): string[]` — walk `root`, default glob `**/*.{jsx,tsx,js,ts}`, exclude `node_modules`/`dist`/`.semantic-inspector` and dotdirs. | node |
+| `src/collectSourceFiles.ts` (new) | `collectSourceFiles(root, include?): string[]` — recursively walk `root`, include `.jsx/.tsx/.js/.ts` (skip `*.test.*` and `*.d.ts`), exclude `node_modules`/`dist`/`.semantic-inspector` and dotdirs; optional `include` = path-prefix filters (dependency-free, no glob lib). | node |
 | `src/resolveAnchor.ts` (new) | `resolveAnchor(anchor, lastSeen, candidates): DriftEntry` — pure scoring + ranking by stability order → verdict, `resolvedLoc`, ranked candidates. | pure |
 | `src/driftCheck.ts` (new) | Orchestrate: `readAnnotations` → `collectSourceFiles` → `staticAnchors` (all files) → `resolveAnchor` per annotation → `DriftResult`. | node |
 | `src/driftReport.ts` (new) | `formatHuman(result): string`, `formatJson(result): string`. Pure. | pure |
 | `src/driftFix.ts` (new) | Relock `moved` entries (and fill a null `loc` on a unique match) → update `lastSeen` + `updatedAt`, persist via existing `writeAnnotations` (regenerates `.md`). Leaves missing/ambiguous untouched. | node |
-| `src/cli.ts` (new) | `node:util` `parseArgs`; wire pipeline; print; `process.exit(code)`. Shebang via tsup banner. | node |
+| `src/driftCli.ts` (new) | `runCli(argv, now?): Promise<number>` — `node:util` `parseArgs`, wire the pipeline, print, and **return** an exit code (no `process.exit`, so it is unit-testable). | node |
+| `src/cli.ts` (new) | Tiny bin shim: shebang + dynamic-import `driftCli` + `process.exit(await runCli(...))`; prints a friendly hint if `@babel/core` is absent. Excluded from coverage. | node |
 | `src/stampLocBabel.ts` (modify) | Export `nearestComponentName` (or extract to a shared `componentName.ts`) so `staticAnchors` reuses it instead of duplicating. | node |
 | `src/types.ts` (modify) | Add `StaticElement`, `DriftVerdict`, `DriftEntry`, `DriftResult`. | — |
 | `package.json` (modify) | Add `"bin": { "semantic-inspector": "./dist/cli.js" }`. | — |
-| `tsup.config.ts` (modify) | Add `src/cli.ts` entry; shebang banner; `@babel/core` external. | — |
+| `tsup.config.ts` (modify) | Add `src/cli.ts` entry; esbuild preserves the entry shebang; `@babel/core` already external. | — |
 | `README.md` (modify) | New "Drift detection (CI)" section. | — |
 | `.changeset/*.md` (new) | `minor` changeset. | — |
 
@@ -156,7 +157,7 @@ export interface DriftEntry {
 
 export interface DriftResult {
   entries: DriftEntry[];
-  /** Count of entries whose verdict is not `resolved`. */
+  /** Count of moved/missing/ambiguous entries (resolved + unverifiable excluded). */
   drifted: number;
   /** Count of `resolved` entries. */
   ok: number;
@@ -257,7 +258,7 @@ throws on bad shape/version and that is surfaced, never silently overwritten). A
 | `--fix` | apply safe relocks and persist |
 | `--json` | emit the JSON report to stdout instead of the human table |
 | `--root <dir>` | project root (default `process.cwd()`); annotations read from `<root>/.semantic-inspector/annotations.json` |
-| `--include <glob>` | override the source glob (repeatable); default `**/*.{jsx,tsx,js,ts}` |
+| `--include <prefix>` | restrict the scan to a path prefix under root (repeatable); default scans all `.jsx/.tsx/.js/.ts` |
 | `--allow-moved` | `moved` → warning (exit 0) |
 | `--strict` | `unverifiable` → drift (exit 1) |
 | `--help` / `--version` | usage / version |
@@ -321,8 +322,8 @@ green.
   browser-only consumers free of Babel while the CLI (a separate entry, tree-shaken out of the
   browser bundle) gets what it needs. Most consumers already have `@babel/core` (the Vite/Babel
   stamp depends on it).
-- `tsup.config.ts`: add `src/cli.ts` to entries, set a `#!/usr/bin/env node` banner for it, and mark
-  `@babel/core` external.
+- `tsup.config.ts`: add `src/cli.ts` to entries; esbuild preserves the `#!/usr/bin/env node` shebang
+  at the top of the entry file (no banner config needed); `@babel/core` is already external.
 
 ## Security
 
