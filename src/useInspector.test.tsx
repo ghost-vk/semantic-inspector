@@ -169,3 +169,42 @@ describe('useInspector — semantic', () => {
     expect(copyText).toHaveBeenCalledWith('NavItem:Рубрики:2/2');
   });
 });
+
+const ANNOTATE: KeyboardEventInit = { key: 'a', code: 'KeyA', altKey: true, shiftKey: true };
+
+describe('useInspector — annotate mode', () => {
+  it('annotate hotkey toggles annotate mode only when annotate is enabled', () => {
+    const off = renderHook(() => useInspector({ annotate: false }));
+    act(() => press(ANNOTATE));
+    expect(off.result.current.mode).toBe('off');
+
+    const on = renderHook(() => useInspector({ annotate: true }));
+    act(() => press(ANNOTATE));
+    expect(on.result.current.mode).toBe('annotate');
+    expect(on.result.current.active).toBe(true);
+  });
+
+  it('clicking in annotate mode opens a draft and does not copy', async () => {
+    const el = navTree();
+    const { result } = renderHook(() => useInspector({ annotate: true }));
+    act(() => press(ANNOTATE));
+    vi.spyOn(document, 'elementFromPoint').mockReturnValue(el);
+    await act(async () => {
+      window.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: 1, clientY: 1 }));
+    });
+    expect(result.current.draft?.target.el).toBe(el);
+    expect(copyText).not.toHaveBeenCalled();
+  });
+
+  it('closeDraft clears the draft', async () => {
+    const el = navTree();
+    const { result } = renderHook(() => useInspector({ annotate: true }));
+    act(() => press(ANNOTATE));
+    vi.spyOn(document, 'elementFromPoint').mockReturnValue(el);
+    await act(async () => {
+      window.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: 1, clientY: 1 }));
+    });
+    act(() => result.current.closeDraft());
+    expect(result.current.draft).toBeNull();
+  });
+});
