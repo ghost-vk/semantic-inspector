@@ -133,6 +133,44 @@ Given a name (e.g. "пилюля"): read `.semantic-inspector/annotations.json`,
 the live code in decreasing order of stability — `data-testid` → `id`/`name`/`href` → visible
 `text` near the `data-comp`. Treat `lastSeen.loc` as a first guess only; verify it.
 
+## Drift detection (CI)
+
+Annotations anchor on durable signals, but code still changes. `semantic-inspector check` re-resolves
+every entry in `.semantic-inspector/annotations.json` against your current source (static Babel
+analysis — no browser, no build) and reports drift, so CI can block a merge until the graph is
+updated, and an AI agent can re-anchor what moved.
+
+```bash
+npx semantic-inspector check            # human table, exits 1 on drift
+npx semantic-inspector check --json     # machine report for an AI agent
+npx semantic-inspector check --fix      # relock entries that moved to a new, unique location
+```
+
+Each annotation gets a verdict:
+
+| verdict | meaning | CI (default) | `--fix` |
+| --- | --- | --- | --- |
+| `resolved` | found at the recorded location | pass | — |
+| `moved` | found, but at a new location (stale `lastSeen.loc`) | **fail** | relocks it |
+| `missing` | no matching element — deleted or renamed | **fail** | re-anchor by hand/AI |
+| `ambiguous` | several equally-good matches | **fail** | disambiguate by hand/AI |
+| `unverifiable` | the anchor has no statically-checkable signal | pass (warn) | add a `data-testid` |
+
+Flags: `--root <dir>` (default cwd), `--include <prefix>` (repeatable scan filter), `--allow-moved`
+(moved → warning), `--strict` (unverifiable → failure). Requires `@babel/core` (already present if you
+use the Vite/Babel stamp).
+
+Example CI step — fail the job on drift; the agent then reads `--json`, relocks (`--fix`) or
+re-anchors, and re-runs to green:
+
+```yaml
+- run: npx semantic-inspector check
+```
+
+**Static limits:** anchors whose only signals are dynamic in source (e.g. `href={url}`,
+`{interpolatedText}`) resolve as `unverifiable`. Adding a `data-testid` makes an element robustly
+anchorable — it is the most stable signal in the resolution order.
+
 ## Three entry points
 
 | Import                     | What it is                                                          |

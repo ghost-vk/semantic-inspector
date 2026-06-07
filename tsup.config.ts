@@ -4,7 +4,8 @@ export default defineConfig({
   entry: {
     index: 'src/index.ts',
     vite: 'src/vite.ts',
-    babel: 'src/stampLocBabel.ts'
+    babel: 'src/stampLocBabel.ts',
+    cli: 'src/cli.ts'
   },
   format: ['esm', 'cjs'],
   dts: true,
