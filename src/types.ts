@@ -76,7 +76,13 @@ export type InspectMode = 'off' | 'inspect' | 'annotate';
 
 /** Set when the user clicked an element in annotate mode (the editor is open). */
 export interface AnnotationDraft {
+  /** Live element + geometry, used for the editor's position and label. */
   target: InspectTarget;
+  /** Durable descriptor captured at click time, so the saved anchor reflects what the user
+   * selected — not whatever the DOM looks like seconds later when Save is pressed. */
+  anchor: AnnotationAnchor;
+  /** Non-authoritative file/loc hint captured alongside the anchor at click time. */
+  lastSeen: AnnotationLastSeen;
 }
 
 export interface InspectTarget extends LocInfo {

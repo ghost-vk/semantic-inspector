@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { captureAnchor } from './buildAnnotation';
 import { copyElementShot, copyText } from './clipboard';
 import { extractSemantics } from './extractSemantics';
 import { resolveTarget } from './resolveTarget';
@@ -172,7 +173,10 @@ export function useInspector(opts: SemanticInspectorProps = {}): UseInspectorRes
       e.stopPropagation();
 
       if (mode === 'annotate') {
-        setDraft({ target: t });
+        // Snapshot the descriptor now (highlight is about to freeze), so the saved anchor reflects
+        // exactly what was clicked even if the DOM changes while the editor is open.
+        const { anchor, lastSeen } = captureAnchor(t.el);
+        setDraft({ target: t, anchor, lastSeen });
         return;
       }
 

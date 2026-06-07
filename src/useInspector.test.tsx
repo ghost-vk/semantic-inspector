@@ -207,4 +207,18 @@ describe('useInspector — annotate mode', () => {
     act(() => result.current.closeDraft());
     expect(result.current.draft).toBeNull();
   });
+
+  it('captures the anchor at click time, not at save time (TOCTOU)', async () => {
+    const el = navTree();
+    const { result } = renderHook(() => useInspector({ annotate: true }));
+    act(() => press(ANNOTATE));
+    vi.spyOn(document, 'elementFromPoint').mockReturnValue(el);
+    await act(async () => {
+      window.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: 1, clientY: 1 }));
+    });
+    expect(result.current.draft?.anchor.comp).toBe('NavItem');
+    // The DOM changes while the editor is open; the captured snapshot must not follow it.
+    el.setAttribute('data-comp', 'Renamed');
+    expect(result.current.draft?.anchor.comp).toBe('NavItem');
+  });
 });

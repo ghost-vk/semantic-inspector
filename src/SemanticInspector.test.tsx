@@ -121,6 +121,30 @@ describe('SemanticInspector — annotate', () => {
     expect(onAnnotate).toHaveBeenCalledWith(expect.objectContaining({ name: 'пилюля' }));
   });
 
+  it('keeps the editor open and shows an error when the save fails', async () => {
+    vi.mocked(saveAnnotation).mockRejectedValue(new Error('boom'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const el = annotatable();
+    render(<SemanticInspector annotate />);
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', ANNOTATE_KEY));
+    });
+    vi.spyOn(document, 'elementFromPoint').mockReturnValue(el);
+    await act(async () => {
+      window.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: 1, clientY: 1 }));
+    });
+
+    fireEvent.change(screen.getByLabelText('annotation name'), { target: { value: 'пилюля' } });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Save'));
+    });
+
+    expect(screen.getByText('save failed')).toBeTruthy();
+    expect(screen.getByLabelText('annotation name')).toBeTruthy(); // editor stays open
+    warn.mockRestore();
+  });
+
   it('does not wire the annotate hotkey when annotate is not set', () => {
     render(<SemanticInspector />);
     act(() => {

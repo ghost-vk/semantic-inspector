@@ -46,7 +46,7 @@ export function SemanticInspector(props: SemanticInspectorProps): JSX.Element | 
 
   const submitAnnotation = (name: string, tags: string[], note: string): void => {
     if (!draft) return;
-    const input = buildAnnotation(draft.target.el, name, tags, note);
+    const input = buildAnnotation(draft, name, tags, note);
     saveAnnotation(endpoint, input).then(
       (saved: Annotation) => {
         setToast(`✓ ${saved.name}`);
