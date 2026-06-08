@@ -38,3 +38,15 @@ gitignored.
 `semantic-inspector/vite` to the package source. Stamping runs only on the dev server
 (`apply: 'serve'`), so `vite build` produces an unstamped bundle — the build is used by CI only to
 catch a breaking package change, not for the interactive experience.
+
+### Stamping a build (`applyOnBuild`)
+
+`vite build` produces an **unstamped** bundle by default — the inspector shows `S · no source`.
+For staging / dev-stand builds where the inspector must work against the built app:
+
+```ts
+stampLocVite({ rootDir: root, applyOnBuild: true })
+```
+
+> **Security:** `applyOnBuild: true` embeds source file paths into the shipped DOM. Leave it **off**
+> for any publicly shipped production build.

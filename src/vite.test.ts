@@ -11,10 +11,20 @@ function getTransform(): TransformFn {
 }
 
 describe('stampLocVite', () => {
-  it('declares itself as a dev-server, pre-enforced plugin', () => {
-    const plugin = stampLocVite();
-    expect(plugin.enforce).toBe('pre');
-    expect(plugin.apply).toBe('serve');
+  describe('apply gating (serve vs build)', () => {
+    it('defaults to serve-only so stamps never reach a prod build', () => {
+      expect(stampLocVite().apply).toBe('serve');
+      expect(stampLocVite({ applyOnBuild: false }).apply).toBe('serve');
+    });
+    it('applyOnBuild:true → apply:undefined (runs in serve + build)', () => {
+      expect(stampLocVite({ applyOnBuild: true }).apply).toBeUndefined();
+    });
+    it('enforce stays pre in both modes', () => {
+      expect(stampLocVite({ applyOnBuild: true }).enforce).toBe('pre');
+    });
+    it('configureServer always present (Vite only calls it on dev server, not in build)', () => {
+      expect(typeof stampLocVite({ applyOnBuild: true }).configureServer).toBe('function');
+    });
   });
 
   it('skips node_modules and non-jsx files', async () => {

@@ -351,6 +351,7 @@ raw (not via `<SemanticInspector>`), it has no default `onError`, so failures on
 | `rootDir`  | `process.cwd()`  | both         | base for the relative path written into `data-loc` |
 | `include`  | `/\.[jt]sx$/`    | `/vite` only | which module ids get stamped                   |
 | `annotateEndpoint` | `'/__semantic_inspector/annotations'` | `/vite` only | path the annotate middleware listens on; must match the `<SemanticInspector annotateEndpoint>` prop |
+| `applyOnBuild` | `false`        | `/vite` | Also stamp during `vite build`. **Embeds source paths in the bundle — keep off for public production.** |
 | `attrLoc`  | `'data-loc'`     | both         | attribute name for `path:line:col`             |
 | `attrComp` | `'data-comp'`    | both         | attribute name for the component name          |
 
@@ -370,7 +371,7 @@ punctuation keys are supported (`Alt+1`, `Ctrl+/`). `Esc` always exits inspect m
 | --- | --- | --- |
 | Nothing copies, no error | `navigator.clipboard` needs a secure context | Use `localhost` or `https://`, not `http://192.168.x.x` |
 | Screenshot is blank/partial | CORS-tainted canvas / unsupported CSS | Serve images with CORS headers; some CSS (cross-origin `<img>`, exotic filters) won't rasterize |
-| `loc` shows `no source` / name is minified | Node wasn't stamped (prod build, or plugin not registered) | Register the stamper (Usage 1) and confirm it isn't gated out in dev |
+| `loc` shows `no source` / name is minified | Node wasn't stamped (prod build, or plugin not registered) | Register the stamper (Usage 1) and confirm it isn't gated out in dev. For a built staging app also set `applyOnBuild: true`. |
 | Hotkey does nothing | Focus is in an input, or a typo in the combo | Use a `Modifier+Key` combo (see above); try the default `Alt+Shift+S` |
 
 ## Browser support
