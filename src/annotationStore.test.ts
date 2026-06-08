@@ -36,7 +36,7 @@ describe('annotationStore', () => {
 
   it('upsert inserts by name and stamps timestamps', () => {
     const file = upsert({ version: 1, annotations: {} }, input(), '2026-01-01T00:00:00.000Z');
-    const a = file.annotations['пилюля'];
+    const a = file.annotations.пилюля;
     expect(a.createdAt).toBe('2026-01-01T00:00:00.000Z');
     expect(a.updatedAt).toBe('2026-01-01T00:00:00.000Z');
     expect(a.anchor.comp).toBe('NavItem');
@@ -45,7 +45,7 @@ describe('annotationStore', () => {
   it('upsert preserves createdAt but bumps updatedAt on update', () => {
     const first = upsert({ version: 1, annotations: {} }, input(), '2026-01-01T00:00:00.000Z');
     const second = upsert(first, input({ note: 'changed' }), '2026-02-02T00:00:00.000Z');
-    const a = second.annotations['пилюля'];
+    const a = second.annotations.пилюля;
     expect(a.createdAt).toBe('2026-01-01T00:00:00.000Z');
     expect(a.updatedAt).toBe('2026-02-02T00:00:00.000Z');
     expect(a.note).toBe('changed');

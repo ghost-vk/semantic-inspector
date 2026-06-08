@@ -17,7 +17,7 @@ describe('resolveTarget', () => {
   it('falls back to the React fiber component name when data-comp is absent', () => {
     document.body.innerHTML = `<div id="f" data-loc="src/W.tsx:1:1"></div>`;
     const el = document.getElementById('f');
-    (el as unknown as Record<string, unknown>)['__reactFiber$test'] = { type: { name: 'Widget' }, return: null };
+    (el as unknown as Record<string, unknown>).__reactFiber$test = { type: { name: 'Widget' }, return: null };
     expect(resolveTarget(el)?.comp).toBe('Widget');
   });
 

@@ -27,6 +27,7 @@ const validInput = (over: Partial<AnnotationInput> = {}): AnnotationInput => ({
 
 // biome-ignore lint/suspicious/noExplicitAny: lightweight req/res doubles for a connect handler
 function mockReq(method: string, url: string, body?: unknown, headers: Record<string, string> = {}): any {
+  // biome-ignore lint/suspicious/noExplicitAny: same lightweight double
   const r = Readable.from([body === undefined ? '' : JSON.stringify(body)]) as any;
   r.method = method;
   r.url = url;
@@ -106,7 +107,7 @@ describe('createAnnotationMiddleware', () => {
     expect(res._status).toBe(200);
     expect(JSON.parse(res._body).name).toBe('пилюля');
     const stored = JSON.parse(readFileSync(annotationPaths(dir).json, 'utf8'));
-    expect(stored.annotations['пилюля']).toBeTruthy();
+    expect(stored.annotations.пилюля).toBeTruthy();
   });
 
   it('responds 400 on an invalid body', async () => {
