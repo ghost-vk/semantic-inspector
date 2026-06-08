@@ -12,6 +12,9 @@ export default defineConfig({
   plugins: [
     // Stamp this app's JSX with data-loc/data-comp and mount the annotate endpoint.
     // rootDir scopes data-loc paths and the .semantic-inspector/ output to the playground.
+    // To also stamp a `vite build` output (staging / dev-stand only — embeds source paths in the
+    // bundle, keep off for public production):
+    //   stampLocVite({ rootDir: root, applyOnBuild: true })
     stampLocVite({ rootDir: root }),
     react()
   ],

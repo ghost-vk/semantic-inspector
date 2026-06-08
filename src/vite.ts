@@ -8,6 +8,12 @@ export interface StampLocViteOptions extends StampLocOptions {
   include?: RegExp;
   /** Path the annotation middleware listens on. Must match the SemanticInspector `annotateEndpoint` prop. Default '/__semantic_inspector/annotations'. */
   annotateEndpoint?: string;
+  /**
+   * Also stamp during `vite build` (not just `vite dev`). Default false — stamps stay out of
+   * production bundles. Enable for staging/dev-stand builds where the inspector must work against
+   * a built app. WARNING: source file paths are embedded into the shipped bundle's DOM when true.
+   */
+  applyOnBuild?: boolean;
 }
 
 /**
@@ -15,7 +21,10 @@ export interface StampLocViteOptions extends StampLocOptions {
  *
  * `@vitejs/plugin-react` v6 transpiles via oxc (no Babel hook), so the attributes are added in
  * a separate pre-pass (Babel parse + our plugin only; JSX/TS are preserved) and oxc does the
- * rest. It runs only on the dev server (`apply: 'serve'`) so stamps never reach a prod build.
+ * rest. By default it runs only on the dev server (`apply: 'serve'`) so stamps never reach a prod build;
+ * pass `applyOnBuild: true` to also stamp during `vite build` (staging/dev-stand only — embeds
+ * source file paths in the bundle). The annotation middleware (`configureServer`) is always
+ * dev-server-only — Vite never calls it during a build.
  *
  * A parse error in a single file does not fail the build — that file is simply left unstamped
  * (warning in the console).
@@ -32,7 +41,10 @@ export function stampLocVite(opts: StampLocViteOptions = {}): Plugin {
   return {
     name: 'semantic-inspector:stamp-loc',
     enforce: 'pre',
-    apply: 'serve',
+    // 'serve' restricts to the dev server; undefined runs in both serve and build. configureServer
+    // is collected by Vite only on dev-server creation — enabling applyOnBuild does NOT mount the
+    // annotation middleware in a build.
+    apply: opts.applyOnBuild ? undefined : 'serve',
     configureServer(server) {
       server.middlewares.use(createAnnotationMiddleware(rootDir, { endpoint: opts.annotateEndpoint }));
     },
