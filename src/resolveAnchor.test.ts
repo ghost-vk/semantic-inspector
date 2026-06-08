@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveAnchor } from './resolveAnchor';
+import { buildElementIndex, resolveAnchor, resolveAnchorIndexed } from './resolveAnchor';
 import type { AnnotationAnchor, AnnotationLastSeen, StaticElement } from './types';
 
 const el = (over: Partial<StaticElement> = {}): StaticElement => ({
@@ -85,5 +85,41 @@ describe('resolveAnchor', () => {
     expect(r.verdict).toBe('resolved');
     expect(r.lastSeenLoc).toBeNull();
     expect(r.resolvedLoc).toBe('src/New.tsx:3:3');
+  });
+});
+
+describe('resolveAnchorIndexed parity', () => {
+  // The index narrows the candidate set; the verdict MUST be identical to the full-array scan.
+  const cases: { label: string; anchor: AnnotationAnchor; loc: string | null; els: StaticElement[] }[] = [
+    { label: 'resolved', anchor: anchor(), loc: 'src/Sidebar.tsx:10:5', els: [el()] },
+    { label: 'moved', anchor: anchor(), loc: 'src/Sidebar.tsx:10:5', els: [el({ loc: 'src/Sidebar.tsx:42:5' })] },
+    {
+      label: 'missing',
+      anchor: anchor(),
+      loc: 'src/Sidebar.tsx:10:5',
+      els: [el({ attrs: { 'data-testid': 'other' }, text: 'Other', comp: 'Else' })]
+    },
+    { label: 'ambiguous', anchor: anchor(), loc: 'x', els: [el({ loc: 'a.tsx:1:1' }), el({ loc: 'b.tsx:2:2' })] },
+    { label: 'unverifiable', anchor: anchor({ attrs: {}, text: undefined }), loc: null, els: [el()] },
+    { label: 'comp+text only', anchor: anchor({ attrs: {} }), loc: 'src/Sidebar.tsx:10:5', els: [el({ attrs: {} })] }
+  ];
+
+  for (const c of cases) {
+    it(`matches the array path for "${c.label}"`, () => {
+      const direct = resolveAnchor('p', c.anchor, seen(c.loc), c.els);
+      const indexed = resolveAnchorIndexed('p', c.anchor, seen(c.loc), buildElementIndex(c.els));
+      expect(indexed).toEqual(direct);
+    });
+  }
+
+  it('finds a candidate buried among many non-matching elements (index returns it)', () => {
+    const noise = Array.from({ length: 500 }, (_, i) =>
+      el({ loc: `noise/${i}.tsx:1:1`, attrs: { 'data-testid': `n${i}` }, comp: `C${i}`, text: `t${i}` })
+    );
+    const target = el({ loc: 'src/Hit.tsx:7:7' });
+    const index = buildElementIndex([...noise, target]);
+    const r = resolveAnchorIndexed('p', anchor(), seen('src/Sidebar.tsx:10:5'), index);
+    expect(r.verdict).toBe('moved');
+    expect(r.resolvedLoc).toBe('src/Hit.tsx:7:7');
   });
 });

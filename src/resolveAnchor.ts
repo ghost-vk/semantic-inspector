@@ -1,6 +1,14 @@
-import type { AnnotationAnchor, AnnotationLastSeen, DriftEntry, StaticElement } from './types';
+import type { AnnotationAnchor, AnnotationLastSeen, DriftEntry, DriftVerdict, StaticElement } from './types';
 
 const STRONG = ['data-testid', 'id', 'href', 'name'] as const;
+
+/** Verdicts that count as drift (and gate CI). `resolved` and `unverifiable` are not drift. */
+const DRIFT_VERDICTS = new Set<DriftVerdict>(['moved', 'missing', 'ambiguous']);
+
+/** Single source of truth for "does this verdict count as drift". Consumed by driftCheck + applyFix. */
+export function isDrift(verdict: DriftVerdict): boolean {
+  return DRIFT_VERDICTS.has(verdict);
+}
 
 function norm(s: string): string {
   return s.replace(/\s+/g, ' ').trim().toLowerCase();
@@ -53,11 +61,75 @@ function score(anchor: AnnotationAnchor, el: StaticElement): number {
   return s;
 }
 
-export function resolveAnchor(
+/**
+ * An index over the static elements for fast candidate lookup. Each element is bucketed under every
+ * STRONG attribute value it carries and under its component name. `candidatesFor` then unions only
+ * the buckets an anchor could possibly match — a *superset* of the elements that pass meetsThreshold
+ * — so indexed resolution is verdict-identical to scanning the whole array, but O(candidates) per
+ * anchor instead of O(elements). Without it the resolver is O(annotations · elements).
+ */
+export interface ElementIndex {
+  byAttr: Record<(typeof STRONG)[number], Map<string, StaticElement[]>>;
+  byComp: Map<string, StaticElement[]>;
+}
+
+function pushBucket(map: Map<string, StaticElement[]>, key: string, el: StaticElement): void {
+  const bucket = map.get(key);
+  if (bucket) bucket.push(el);
+  else map.set(key, [el]);
+}
+
+export function buildElementIndex(elements: StaticElement[]): ElementIndex {
+  const byAttr = {
+    'data-testid': new Map<string, StaticElement[]>(),
+    id: new Map<string, StaticElement[]>(),
+    href: new Map<string, StaticElement[]>(),
+    name: new Map<string, StaticElement[]>()
+  };
+  const byComp = new Map<string, StaticElement[]>();
+  for (const el of elements) {
+    for (const k of STRONG) {
+      const v = el.attrs[k];
+      if (v != null) pushBucket(byAttr[k], v, el);
+    }
+    if (el.comp) pushBucket(byComp, el.comp, el);
+  }
+  return { byAttr, byComp };
+}
+
+/** Union of the index buckets an anchor could match, de-duplicated (an element may be in several). */
+function candidatesFor(index: ElementIndex, anchor: AnnotationAnchor): StaticElement[] {
+  const seen = new Set<StaticElement>();
+  const out: StaticElement[] = [];
+  const add = (els: StaticElement[] | undefined): void => {
+    if (!els) return;
+    for (const el of els) {
+      if (!seen.has(el)) {
+        seen.add(el);
+        out.push(el);
+      }
+    }
+  };
+  const aa = anchor.attrs ?? {};
+  for (const k of STRONG) {
+    const v = aa[k];
+    if (v) add(index.byAttr[k].get(v));
+  }
+  // The comp+text threshold branch can only fire when both are present on the anchor.
+  if (anchor.comp && anchor.text) add(index.byComp.get(anchor.comp));
+  return out;
+}
+
+/**
+ * Score the candidate elements and pick a verdict. `candidates` may be the whole element array
+ * (resolveAnchor) or an index-narrowed superset (resolveAnchorIndexed); the meetsThreshold filter
+ * inside makes both paths produce the same verdict.
+ */
+function decide(
   name: string,
   anchor: AnnotationAnchor,
   lastSeen: AnnotationLastSeen,
-  elements: StaticElement[]
+  candidates: StaticElement[]
 ): DriftEntry {
   const base = {
     name,
@@ -68,7 +140,7 @@ export function resolveAnchor(
 
   if (!verifiable(anchor)) return { ...base, verdict: 'unverifiable' };
 
-  const scored = elements
+  const scored = candidates
     .filter((el) => meetsThreshold(anchor, el))
     .map((el) => ({ loc: el.loc, score: score(anchor, el) }))
     .sort((a, b) => b.score - a.score || (a.loc < b.loc ? -1 : a.loc > b.loc ? 1 : 0));
@@ -80,9 +152,29 @@ export function resolveAnchor(
     return { ...base, verdict: 'ambiguous', candidates: scored.filter((c) => c.score === top.score) };
   }
 
-  const candidates = [top];
+  const candidatesOut = [top];
   if (lastSeen.loc != null && top.loc !== lastSeen.loc) {
-    return { ...base, verdict: 'moved', resolvedLoc: top.loc, candidates };
+    return { ...base, verdict: 'moved', resolvedLoc: top.loc, candidates: candidatesOut };
   }
-  return { ...base, verdict: 'resolved', resolvedLoc: top.loc, candidates };
+  return { ...base, verdict: 'resolved', resolvedLoc: top.loc, candidates: candidatesOut };
+}
+
+/** Resolve an anchor by scanning the full element array. Pure reference path used by unit tests. */
+export function resolveAnchor(
+  name: string,
+  anchor: AnnotationAnchor,
+  lastSeen: AnnotationLastSeen,
+  elements: StaticElement[]
+): DriftEntry {
+  return decide(name, anchor, lastSeen, elements);
+}
+
+/** Resolve an anchor using a prebuilt index. Verdict-identical to resolveAnchor; the production path. */
+export function resolveAnchorIndexed(
+  name: string,
+  anchor: AnnotationAnchor,
+  lastSeen: AnnotationLastSeen,
+  index: ElementIndex
+): DriftEntry {
+  return decide(name, anchor, lastSeen, candidatesFor(index, anchor));
 }

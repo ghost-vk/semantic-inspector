@@ -46,7 +46,9 @@ jobs:
   package:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: lint-and-typecheck
+    # Gate on the full test matrix too, not just lint/typecheck: test:dist runs the built bin, so the
+    # package job should only spend build time once the source suite is green across Node versions.
+    needs: [lint-and-typecheck, test]
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5

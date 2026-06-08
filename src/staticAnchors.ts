@@ -1,11 +1,11 @@
 import type { types as BabelTypes, NodePath } from '@babel/core';
 import { parseSync, traverse } from '@babel/core';
+import { ATTR_WHITELIST, cappedPath, normalizeText, pushPathSegment } from './semanticShape';
 import { isHostElement, nearestComponentName } from './stampLocBabel';
 import type { StaticElement } from './types';
 
-const ATTR_WHITELIST = ['id', 'data-testid', 'name', 'href', 'type'];
-const TEXT_CAP = 160;
-const PATH_CAP = 4;
+// ATTR_WHITELIST is a readonly literal tuple; widen for the runtime `includes(string)` membership test.
+const WHITELIST: readonly string[] = ATTR_WHITELIST;
 
 function parserPlugins(file: string): ('jsx' | 'typescript')[] {
   if (file.endsWith('.tsx')) return ['jsx', 'typescript'];
@@ -17,7 +17,7 @@ function literalAttrs(open: BabelTypes.JSXOpeningElement): Record<string, string
   const out: Record<string, string> = {};
   for (const a of open.attributes) {
     if (a.type !== 'JSXAttribute' || a.name.type !== 'JSXIdentifier') continue;
-    if (!ATTR_WHITELIST.includes(a.name.name)) continue;
+    if (!WHITELIST.includes(a.name.name)) continue;
     const v = a.value;
     if (v?.type === 'StringLiteral') out[a.name.name] = v.value;
     else if (v?.type === 'JSXExpressionContainer' && v.expression.type === 'StringLiteral') {
@@ -38,10 +38,7 @@ function literalText(node: BabelTypes.JSXElement): string | undefined {
     }
   };
   walk(node.children);
-  const raw = parts.join('').replace(/\s+/g, ' ').trim();
-  if (!raw) return undefined;
-  const cp = [...raw];
-  return cp.length > TEXT_CAP ? `${cp.slice(0, TEXT_CAP).join('')}…` : raw;
+  return normalizeText(parts.join(''));
 }
 
 function componentPath(path: NodePath<BabelTypes.JSXElement>): string[] {
@@ -49,12 +46,11 @@ function componentPath(path: NodePath<BabelTypes.JSXElement>): string[] {
   let p: NodePath | null = path;
   while (p) {
     if (p.isJSXElement() && isHostElement(p.node.openingElement.name)) {
-      const c = nearestComponentName(p);
-      if (c && chain[chain.length - 1] !== c) chain.push(c);
+      pushPathSegment(chain, nearestComponentName(p));
     }
     p = p.parentPath;
   }
-  return chain.slice(0, PATH_CAP).reverse();
+  return cappedPath(chain);
 }
 
 /**

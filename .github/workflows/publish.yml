@@ -66,3 +66,14 @@ jobs:
           npm i "semantic-inspector@$VERSION" @babel/core
           node -e "const b = require('semantic-inspector/babel'); if (typeof b.stampLocBabel !== 'function') { throw new Error('babel entry not callable'); }"
           node --input-type=module -e "import('semantic-inspector').then((m) => { if (!m.SemanticInspector || !m.useInspector) { process.exit(1); } })"
+          # The published bin must run and report the version it was published as.
+          VER_OUT=$(npx --no-install semantic-inspector --version)
+          if [ "$VER_OUT" != "$VERSION" ]; then
+            echo "::error::published bin --version ($VER_OUT) does not match $VERSION"
+            exit 1
+          fi
+          # `check --json` on a clean tree must exit 0 and emit the documented agent-contract key set.
+          mkdir -p sub/.semantic-inspector
+          echo '{"version":1,"annotations":{}}' > sub/.semantic-inspector/annotations.json
+          npx --no-install semantic-inspector check --json --root sub > report.json
+          node -e "const r = require('./report.json'); for (const k of ['drifted','ok','skipped','entries']) { if (!(k in r)) { console.error('::error::--json report missing key '+k); process.exit(1); } } if (!Array.isArray(r.entries)) { console.error('::error::entries not an array'); process.exit(1); } console.log('bin e2e ok');"

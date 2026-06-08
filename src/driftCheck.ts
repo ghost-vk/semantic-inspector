@@ -2,11 +2,9 @@ import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { readAnnotations } from './annotationStore';
 import { collectSourceFiles } from './collectSourceFiles';
-import { resolveAnchor } from './resolveAnchor';
+import { buildElementIndex, isDrift, resolveAnchorIndexed } from './resolveAnchor';
 import { staticAnchors } from './staticAnchors';
 import type { DriftResult, StaticElement } from './types';
-
-const DRIFTED = new Set(['moved', 'missing', 'ambiguous']);
 
 /**
  * Hard cap on a single source file's byte size before it is handed to Babel. Babel's parser keeps
@@ -55,11 +53,12 @@ export function driftCheck(root: string, opts: { include?: string[] } = {}): Dri
     }
   }
 
+  const index = buildElementIndex(elements);
   const entries = names.map((name) => {
     const a = file.annotations[name];
-    return resolveAnchor(name, a.anchor, a.lastSeen, elements);
+    return resolveAnchorIndexed(name, a.anchor, a.lastSeen, index);
   });
-  const drifted = entries.filter((e) => DRIFTED.has(e.verdict)).length;
+  const drifted = entries.filter((e) => isDrift(e.verdict)).length;
   const ok = entries.filter((e) => e.verdict === 'resolved').length;
   return { entries, drifted, ok, skipped };
 }
