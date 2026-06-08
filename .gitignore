@@ -10,3 +10,7 @@ coverage/
 .full-review/
 .semantic-inspector/
 examples/playground/dist/
+.pnp.cjs
+.pnp.loader.mjs
+.yarn/
+yarn.lock
