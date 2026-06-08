@@ -145,7 +145,13 @@ function decide(
     .map((el) => ({ loc: el.loc, score: score(anchor, el) }))
     .sort((a, b) => b.score - a.score || (a.loc < b.loc ? -1 : a.loc > b.loc ? 1 : 0));
 
-  if (scored.length === 0) return { ...base, verdict: 'missing' };
+  if (scored.length === 0) {
+    // Candidates exist but none passed meetsThreshold. If every candidate lacks static text
+    // (dynamic content via props) and the anchor matched only on comp+text, the mismatch is a
+    // static-analysis limitation, not a real disappearance — report unverifiable, not missing.
+    const allDynamic = candidates.length > 0 && candidates.every((el) => !el.text);
+    return { ...base, verdict: allDynamic ? 'unverifiable' : 'missing' };
+  }
 
   const top = scored[0];
   if (scored.length > 1 && scored[1].score === top.score) {
