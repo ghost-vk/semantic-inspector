@@ -31,8 +31,9 @@ Peer dependencies:
 
 - `react` / `react-dom` (`>=18`) — required.
 - `vite` (`>=5`) — optional, only for `semantic-inspector/vite`.
-- `@babel/core` (`>=7.25`) — optional, only for `semantic-inspector/vite` or
-  `semantic-inspector/babel`. Most Vite + React projects already have it; if not:
+- `@babel/core` (`>=7.25`) — optional, needed for `semantic-inspector/vite`,
+  `semantic-inspector/babel`, **and the `semantic-inspector check` drift CLI** (it parses your
+  source with Babel). Most Vite + React projects already have it; if not:
   ```sh
   npm i -D @babel/core
   ```
@@ -150,34 +151,111 @@ Each annotation gets a verdict:
 
 | verdict | meaning | CI (default) | `--fix` |
 | --- | --- | --- | --- |
-| `resolved` | found at the recorded location | pass | — |
+| `resolved` | found at the recorded location | pass | relocks if the stored loc is stale/absent ¹ |
 | `moved` | found, but at a new location (stale `lastSeen.loc`) | **fail** | relocks it |
 | `missing` | no matching element — deleted or renamed | **fail** | re-anchor by hand/AI |
 | `ambiguous` | several equally-good matches | **fail** | disambiguate by hand/AI |
-| `unverifiable` | the anchor has no statically-checkable signal | pass (warn) | add a `data-testid` |
+| `unverifiable` | no statically-resolvable signal (all signals are dynamic in source) | pass (warn) | add any static signal ² |
+
+¹ **What `--fix` actually relocks:** every entry whose anchor resolves to a single location that
+differs from the stored `lastSeen.loc` — that is each `moved` entry, **and** a freshly-anchored entry
+whose `lastSeen.loc` was never stamped (verdict `resolved`, old loc `null`). The anchor itself is
+never changed; only `lastSeen` + `updatedAt` are. So `--fix` can write to the store **even when the
+headline reads `0 drifted`** (relocking a newly-found, previously-unstamped entry).
+
+² **What makes an element verifiable:** any one of `data-testid`, `id`, `name`, `href`, or literal
+element text is enough to resolve it statically — `data-testid` is simply the highest-weighted
+signal, not a requirement. Only elements whose every signal is dynamic in source (e.g. `href={url}`,
+`{interpolatedText}` with no stable attribute) come back `unverifiable`.
 
 Flags: `--root <dir>` (default cwd), `--include <prefix>` (repeatable scan filter), `--allow-moved`
-(moved → warning), `--strict` (unverifiable → failure). Requires `@babel/core` (already present if you
+(moved → warning), `--strict` (unverifiable → failure), `--json` (machine report), `--fix` (relock),
+`--help`, `--version`. Exit codes: **0** = clean, **1** = drift (something to fix), **2** = error
+(bad args, unreadable/malformed `annotations.json`). Requires `@babel/core` (already present if you
 use the Vite/Babel stamp).
 
-Example CI step — fail the job on drift; the agent then reads `--json`, relocks (`--fix`) or
-re-anchors, and re-runs to green:
+### What is scanned
 
-```yaml
-- run: npx semantic-inspector check
+The check walks the tree under `--root` and parses every `.ts` / `.tsx` / `.js` / `.jsx` file,
+**skipping**: `node_modules/`, `dist/`, any dotdir (`.git`, `.semantic-inspector`, …), test files
+(`*.test.*`), and `*.d.ts`. `--include <prefix>` (repeatable) narrows the scan to paths under one or
+more prefixes (e.g. `--include src/components`). A file larger than ~2 MB is **skipped** (Babel would
+risk an out-of-memory crash on it) and counted in `skipped`; a file that fails to parse is likewise
+skipped + counted. When `skipped > 0` the scan was partial, so treat a `missing` verdict with caution
+— the human report prints a warning line and the JSON report carries the count.
+
+> If an annotated element lives in a skipped location (a test file, a dotdir, an excluded prefix), it
+> will report `missing` even though it exists. Add its directory to the scan with `--include`, or
+> move the element out of an ignored path.
+
+### Machine report (`--json`)
+
+`--json` is the **AI-agent contract**: a stable, machine-readable snapshot an agent reads to re-anchor
+the graph. Shape:
+
+```jsonc
+{
+  "drifted": 1,        // count of moved + missing + ambiguous (resolved + unverifiable excluded)
+  "ok": 2,             // count of resolved entries
+  "skipped": 0,        // source files not analyzed (too large / parse error); > 0 ⇒ partial scan
+  "entries": [
+    {
+      "name": "save-button",          // the annotation name (key in annotations.json)
+      "verdict": "moved",             // "resolved" | "moved" | "missing" | "ambiguous" | "unverifiable"
+      "lastSeenLoc": "src/Form.tsx:12:5",  // stored loc snapshot, or null when never stamped
+      "resolvedLoc": "src/Form.tsx:40:5",  // where it resolves now: same as lastSeenLoc when resolved,
+                                            // the new loc when moved, else null (missing/ambiguous)
+      "candidates": [                  // ranked matches, score desc then loc asc
+        { "loc": "src/Form.tsx:40:5", "score": 100 }
+      ]
+    }
+  ]
+}
 ```
 
-**Static limits:** anchors whose only signals are dynamic in source (e.g. `href={url}`,
-`{interpolatedText}`) resolve as `unverifiable`. Adding a `data-testid` makes an element robustly
-anchorable — it is the most stable signal in the resolution order.
+Field stability: the top-level keys (`drifted`, `ok`, `skipped`, `entries`) and the per-entry keys are
+covered by semver — additive changes only within a major. `score` weights are an internal heuristic
+and may change between minors; rank order (best first) is the stable signal, not the absolute number.
 
-## Three entry points
+**Agent recipe:** run `semantic-inspector check --json`; for each `entry` where `verdict === "moved"`,
+the fix is `resolvedLoc` (apply with `--fix`); for `missing` / `ambiguous`, read `candidates` and the
+source to re-anchor by hand; ignore `resolved` / `unverifiable`; if `skipped > 0`, the scan was
+partial — don't trust `missing` without widening the scan.
 
-| Import                     | What it is                                                          |
+### Example CI step
+
+Fail the job on drift; an agent then reads `--json`, relocks (`--fix`) or re-anchors, and re-runs to
+green:
+
+```yaml
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npx semantic-inspector check   # exit 1 on drift blocks the merge
+```
+
+`npm ci` is what makes `@babel/core` available to the check; if it isn't a (transitive) dependency,
+add `npm i -D @babel/core` or install it as a dedicated CI step.
+
+## Entry points
+
+Three import surfaces plus one executable:
+
+| Surface                    | What it is                                                          |
 | -------------------------- | ------------------------------------------------------------------ |
 | `semantic-inspector`       | `<SemanticInspector/>` + `useInspector()` — overlay/hotkey/clipboard runtime. |
 | `semantic-inspector/vite`  | `stampLocVite()` — Vite plugin that stamps `data-loc` / `data-comp`. |
 | `semantic-inspector/babel` | `{ stampLocBabel }` — raw Babel plugin, for the Babel variant of `@vitejs/plugin-react`. |
+| `semantic-inspector` (bin) | the `check` drift CLI — `npx semantic-inspector check` (see [Drift detection](#drift-detection-ci)). |
+
+The import surfaces are browser/dev-server code; the `check` bin is **node-only** (it reads the
+filesystem and parses with Babel) and never enters the browser bundle.
 
 ## Usage
 

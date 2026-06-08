@@ -32,7 +32,7 @@ function detail(e: DriftEntry): string {
     case 'ambiguous':
       return e.candidates.map((c) => c.loc).join(' · ');
     case 'unverifiable':
-      return 'no stable signal — add data-testid';
+      return 'no static signal — add a data-testid / id / name / href or literal text';
   }
 }
 
@@ -52,6 +52,11 @@ export function formatHuman(result: DriftResult): string {
     lines.push(`  ${MARK[e.verdict]} ${LABEL[e.verdict].padEnd(10)} ${e.name.padEnd(14)} ${detail(e)}`);
   }
   lines.push('');
+  if (result.skipped > 0) {
+    lines.push(
+      `⚠ ${result.skipped} file${result.skipped === 1 ? '' : 's'} skipped (too large or parse error) — results may be incomplete.`
+    );
+  }
   const fixable = result.entries.filter(isFixable).length;
   const tail = fixable ? ` (${fixable} fixable). Run --fix to relock.` : '.';
   lines.push(`${result.drifted} drifted${tail}`);
@@ -59,5 +64,9 @@ export function formatHuman(result: DriftResult): string {
 }
 
 export function formatJson(result: DriftResult): string {
-  return JSON.stringify({ drifted: result.drifted, ok: result.ok, entries: result.entries }, null, 2);
+  return JSON.stringify(
+    { drifted: result.drifted, ok: result.ok, skipped: result.skipped, entries: result.entries },
+    null,
+    2
+  );
 }

@@ -30,6 +30,7 @@ const seed = (): AnnotationFile => ({
 const movedResult: DriftResult = {
   drifted: 1,
   ok: 0,
+  skipped: 0,
   entries: [
     { name: 'btn', verdict: 'moved', lastSeenLoc: 'src/F.tsx:1:1', resolvedLoc: 'src/F.tsx:9:3', candidates: [] }
   ]
@@ -55,6 +56,7 @@ describe('driftFix', () => {
       {
         drifted: 1,
         ok: 1,
+        skipped: 0,
         entries: [
           {
             name: 'btn',

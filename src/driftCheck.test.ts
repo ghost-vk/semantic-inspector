@@ -34,7 +34,7 @@ const annoFile = (loc: string): AnnotationFile => ({
 
 describe('driftCheck', () => {
   it('returns empty result when there are no annotations', () => {
-    expect(driftCheck(dir)).toEqual({ entries: [], drifted: 0, ok: 0 });
+    expect(driftCheck(dir)).toEqual({ entries: [], drifted: 0, ok: 0, skipped: 0 });
   });
 
   it('reports resolved when the element is at the recorded loc', () => {
@@ -54,13 +54,27 @@ describe('driftCheck', () => {
     expect(r.drifted).toBe(1);
   });
 
-  it('skips an unparseable file with a warning, does not throw', () => {
+  it('skips an unparseable file with a warning, counts it, does not throw', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     writeSrc('src/Bad.tsx', 'function Bad( { return <div>;');
     writeSrc('src/F.tsx', 'function F() { return <button data-testid="save">Save</button>; }');
     writeAnnotations(dir, annoFile('src/F.tsx:1:23'));
-    expect(() => driftCheck(dir)).not.toThrow();
+    const r = driftCheck(dir);
+    expect(r.skipped).toBe(1);
+    expect(r.entries[0].verdict).toBe('resolved'); // the parseable file still resolves
     expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('skips a file over the parse byte cap and surfaces it in skipped', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    writeSrc('src/Huge.tsx', `// ${'x'.repeat(2_100_000)}\n`);
+    writeSrc('src/F.tsx', 'function F() { return <button data-testid="save">Save</button>; }');
+    writeAnnotations(dir, annoFile('src/F.tsx:1:23'));
+    const r = driftCheck(dir);
+    expect(r.skipped).toBe(1);
+    expect(r.entries[0].verdict).toBe('resolved'); // the small file is still parsed + resolved
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('parse cap'));
     warn.mockRestore();
   });
 });
