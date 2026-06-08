@@ -1,11 +1,9 @@
 import { resolveComp } from './resolveTarget';
+import { ATTR_WHITELIST, cappedPath, normalizeText, pushPathSegment } from './semanticShape';
 import type { SemanticInfo } from './types';
 
 const LOC_ATTR = 'data-loc';
 const COMP_ATTR = 'data-comp';
-const TEXT_CAP = 160;
-const PATH_CAP = 4;
-const ATTR_WHITELIST = ['id', 'data-testid', 'name', 'href', 'type'] as const;
 
 /**
  * Read semantic signals from a clicked element into a SemanticInfo. Pure (no DOM mutation, no
@@ -28,10 +26,7 @@ export function extractSemantics(el: Element): SemanticInfo {
 }
 
 function extractText(el: Element): string | undefined {
-  const raw = (el.textContent ?? '').replace(/\s+/g, ' ').trim();
-  if (!raw) return undefined;
-  // Slice by code point (spread) so the cap never splits a surrogate pair (emoji / astral chars).
-  return raw.length > TEXT_CAP ? `${[...raw].slice(0, TEXT_CAP).join('')}…` : raw;
+  return normalizeText(el.textContent ?? '');
 }
 
 function siblingIndex(el: Element): { index: number; total: number } | null {
@@ -46,16 +41,14 @@ function siblingIndex(el: Element): { index: number; total: number } | null {
 }
 
 function componentPath(el: Element): string[] {
-  // Collect data-comp values leaf→root, collapsing consecutive duplicates.
+  // Collect data-comp values leaf→root (consecutive dups collapsed), then cap + flip to root→leaf.
   const chain: string[] = [];
   let node: Element | null = el;
   while (node) {
-    const comp = node.getAttribute(COMP_ATTR);
-    if (comp && chain[chain.length - 1] !== comp) chain.push(comp);
+    pushPathSegment(chain, node.getAttribute(COMP_ATTR));
     node = node.parentElement;
   }
-  // Keep the 4 closest to the leaf (first in leaf→root order), then present root→leaf.
-  return chain.slice(0, PATH_CAP).reverse();
+  return cappedPath(chain);
 }
 
 function pickAttrs(el: Element): Record<string, string> | undefined {

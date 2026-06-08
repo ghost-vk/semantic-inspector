@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { driftCheck } from './driftCheck';
-import { driftFix } from './driftFix';
+import { applyFix, driftFix } from './driftFix';
 import { formatHuman, formatJson } from './driftReport';
 import type { DriftResult } from './types';
 
@@ -95,8 +95,8 @@ export async function runCli(argv: string[], now: string = new Date().toISOStrin
   try {
     let result = driftCheck(root, { include: values.include });
     if (values.fix && result.entries.length > 0) {
-      driftFix(root, result, now);
-      result = driftCheck(root, { include: values.include });
+      // Relock in place, then recompute the result in memory — no second collect+parse of the tree.
+      result = applyFix(result, driftFix(root, result, now));
     }
     console.log(values.json ? formatJson(result) : formatHuman(result));
     return exitCode(result, { allowMoved: Boolean(values['allow-moved']), strict: Boolean(values.strict) });
