@@ -1,6 +1,6 @@
 {
   "name": "semantic-inspector",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Dev-only React inspector: a hotkey highlights elements and click-copies their `Component — file:line` (or a PNG screenshot) for fast context handoff to AI coding assistants.",
   "type": "module",
   "license": "MIT",
