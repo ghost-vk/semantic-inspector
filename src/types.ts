@@ -180,4 +180,8 @@ export interface DriftResult {
   drifted: number;
   /** Count of resolved entries. */
   ok: number;
+  /** Source files the scan could not analyze (over the parse byte cap, or a parse error). When
+   * > 0 the scan was partial: some elements were never seen, so a `missing` verdict may be a false
+   * positive. Surfaced in both report formats so a degraded run does not read as authoritative. */
+  skipped: number;
 }

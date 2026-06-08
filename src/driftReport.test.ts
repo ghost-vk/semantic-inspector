@@ -5,6 +5,7 @@ import type { DriftResult } from './types';
 const result: DriftResult = {
   drifted: 2,
   ok: 1,
+  skipped: 0,
   entries: [
     { name: 'ok1', verdict: 'resolved', lastSeenLoc: 'a.tsx:1:1', resolvedLoc: 'a.tsx:1:1', candidates: [] },
     {
@@ -35,18 +36,28 @@ describe('driftReport', () => {
     expect(out).toContain('5 annotations, 2 drifted');
     expect(out).toContain('moved');
     expect(out).toContain('missing');
-    expect(out).toContain('add data-testid');
+    expect(out).toContain('data-testid'); // unverifiable hint lists the stable signals
     expect(out).toContain('fixable'); // the moved entry is fixable
   });
 
   it('formatHuman handles the empty case', () => {
-    expect(formatHuman({ entries: [], drifted: 0, ok: 0 })).toContain('no annotations found');
+    expect(formatHuman({ entries: [], drifted: 0, ok: 0, skipped: 0 })).toContain('no annotations found');
+  });
+
+  it('formatHuman warns when files were skipped', () => {
+    expect(formatHuman({ ...result, skipped: 2 })).toContain('2 files skipped');
   });
 
   it('formatJson emits valid, stable JSON', () => {
     const parsed = JSON.parse(formatJson(result));
     expect(parsed.drifted).toBe(2);
+    expect(parsed.ok).toBe(1);
+    expect(parsed.skipped).toBe(0);
     expect(parsed.entries).toHaveLength(5);
     expect(parsed.entries[1].resolvedLoc).toBe('b.tsx:9:1');
+  });
+
+  it('formatJson surfaces the skipped count', () => {
+    expect(JSON.parse(formatJson({ ...result, skipped: 3 })).skipped).toBe(3);
   });
 });
